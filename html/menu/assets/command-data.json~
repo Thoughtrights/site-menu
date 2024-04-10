@@ -1,0 +1,113 @@
+{
+	"BOOTPROMDATA" : {
+	    "action": "reserved",
+	    "payload": ["                                       Apple //e\n"]
+	},
+	"CATALOG" : {
+	    "action": "print",
+	    "payload": [" \n",
+			"DISK VOLUME 254\n",
+			" \n",
+			" T 019 RESUME\n",
+			" B 030 BARZY\n",
+			" B 008 DAEMOUS\n",
+			" I 040 SPOKENWORD\n",
+			" A 002 FOODNET\n",
+			" A 002 DUNGEONEER\n",
+			" B 007 ALPHACOMPLEX\n",
+			" T 001 INDIGOBRIEF\n",
+			" \n"]
+	},
+	"CAT" : {
+	    "action": "alias",
+	    "payload": ["CATALOG"]
+	},
+    	"INTRODATA": {
+	    "action": "reserved",
+	    "payload": [" \n",
+			"CRACKED BY                   \n",
+			" ____  _      ____  _      _ \n",
+			"/ ___|(_)_ __|  _ `(_) ___| |\n",
+			"`___ `| | '__| |_) | |/ _ ` |\n",
+			" ___) | | |  |  _ <| |  __/ |\n",
+			"|____/|_|_|  |_| `_`_|`___|_|\n\n\n"]
+	},
+	"BRUN BARZY" : {
+	    "action": "redirect",
+	    "payload": ["https://www.thoughtrights.com/barzy/"]
+	},
+	"RUN BARZY" : {
+	    "action": "alias",
+	    "payload": ["BRUN BARZY"]
+	},
+	"BRUN ALPHACOMPLEX" : {
+	    "action": "redirect",
+	    "payload": ["https://www.bin.sh/gaming/alpha/alpha.cgi"]
+	},
+	"RUN ALPHACOMPLEX" : {
+	    "action": "alias",
+	    "payload": ["BRUN ALPHACOMPLEX"]
+	},
+	"BRUN DAEMOUS" : {
+	    "action": "redirect",
+	    "payload": ["https://www.thoughtrights.com/daemous/"]
+	},
+	"RUN DAEMOUS" : {
+	    "action": "alias",
+	    "payload": ["BRUN DAEMOUS"]
+	},
+	"OPEN RESUME" : {
+	    "action": "redirect",
+	    "payload": ["https://www.thoughtrights.com/resume/"]
+	},
+	"RUN DUNGEONEER" : {
+	    "action": "redirect",
+	    "payload": ["https://www.dungeoneer.com/"]
+	},
+	"RUN FOODNET" : {
+	    "action": "redirect",
+	    "payload": ["https://www.food.net/"]
+	},
+	"RUN SPOKENWORD" : {
+	    "action": "redirect",
+	    "payload": ["https://www.thoughtrights.com/spoken-word/"]
+	},
+	"OPEN INDIGOBRIEF": {
+	    "action": "print",
+	    "junk":	"1234567890123456789012345678901234567890123456789012345678901234567890123456789\n",
+	    "payload": ["ATTENTION TROUBLESHOOTER. THIS IS AN INDIGO BRIEFING.\n",
+			" \n",
+			"ALPHA COMPLEX was implemented by drow@bin.sh, aka Doug Rau.\n",
+			"Alpha Complex is a solo Paranoia game written by Sam Shirley, taken from the\n",
+			"Jan/Feb issue (No. 77) of Space Gamer/Fantasy Gamer magazine. This is a public\n",
+			"domain adventure and may not be sold or otherwise used for profit.",
+			"Paranoia images are Copyright (c) West End Games and used without permission.\n",
+			" \n",
+			"THE COMPUTER IS YOUR FRIEND.\n",
+			" \n",
+			"BRUN ALPHACOMPLEX\n",
+			" \n"]
+	},
+	"HELP": {
+	    "action": "print",
+	    "payload": [" \n",
+			"Apple //e DOS 3.3 (c) Apple Computer, Inc. 1983.\n",
+			" \n",
+			"Extended 80-Column Text Card found.\n",
+			" \n",
+			"Commands available:\n",
+			" \n",
+			"CATALOG - lists files on your floppy disk.\n",
+			"RUN - loads and executes Integer BASIC or Applesoft BASIC programs\n",
+			"BRUN - loads and executes binary machine-language files.\n",
+			"OPEN - loads and displays unpacked ASCII text files.\n",
+			"HELP - this command didn't actually exist in DOS 3.3. [You're welcome.]\n",
+			" \n"]
+	},
+	"?" : {
+	    "action": "alias",
+	    "payload": ["HELP"]
+	}
+}
+ 
+
