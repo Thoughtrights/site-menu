@@ -6,7 +6,10 @@ Two main navigation menu options appear in this repo:
 2. A novel 3D model of an Apple IIe turned into a data-driven navigation UI and simulated OS with lots of visual goodness and a slight Through the Looking Glass appeal.
 
 The code is STABLE and mainly considered to still be artistic; It's
-main purpose is to promote exploration and a feeling of discovery.
+main purpose is to promote exploration and a feeling of
+discovery. Nobody alive exactly knows (or remembers) how to use
+one. That's kinda cool to have to knock around and achieve a sense of
+accomplishment.
 
 That discovery and experience may be entirely changed by simple
 changes to the `command-data.json` file.
@@ -30,7 +33,9 @@ correct.
 
 There are UI issues that need some help. The keyboard is done
 interestingly, but it doesn't resemble the actual Apple IIe
-keyboard. That said, I could attach listeners on the keyboard keys.
+keyboard. That said, I could attach listeners on the keyboard keys
+that are there and make some minimal cosmetic changes. This would be
+ideal for mobile use.
 
 Activating the keyboard keys as input devices would be good because
 the keyboard does not auto-raise for mobile devices. The scaffolding
@@ -73,15 +78,20 @@ sounds (plural), boot beeps, and syntax error noises.
 
 ## Conclusions
 
-Overall this was a fun little project that occupied me for two days. I
-spent an amazing amount of time doing tiny only-I-would-notice things
-and very little time doing big things.
+Overall this was a fun little project that occupied me for two
+days. One of those days was until after midnight. I spent an amazing
+amount of time doing tiny only-I-would-notice things and very little
+time doing big things. It was a surprising amount of fun to make.
 
 I do think some CRT Z-index monitor artifacts would be
 neat. Displaying some embeddable website pages would go along with
 that pretty nicely.
 
 
+## Misc
+
+Dropping this here. This is what an Apple IIe looks like.
+[Wikipedia Apple IIe image](https://upload.wikimedia.org/wikipedia/commons/1/1d/Iie-system.jpg)
 
 
 
