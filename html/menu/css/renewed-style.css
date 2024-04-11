@@ -53,6 +53,7 @@ a {
     text-decoration: none;
 }
 .inventory {
+    text-align: left;
     text-decoration: none;
     font-weight: bold;
 }
