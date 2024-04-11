@@ -2,7 +2,7 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Thoughtrights</title>
-<!-- Copyright (c) 2013 Clay Webster, Thoughtrights -->
+<!-- Copyright (c) 2024 Clay Webster, Thoughtrights -->
 <META name="description" content="Thoughtrights">
 <META name="keywords" content="thoughtrights, thoughtwrights, Clay Webster">
 <!-- Google tag (gtag.js) -->
@@ -57,12 +57,15 @@ function nukeFrames() {
       filter: drop-shadow(0.35rem 0.35rem 0.4rem rgba(0, 255, 0, 0.95));
   }
   .maintext {
-      padding-top: 15%;
+      padding-top: 5%;
       width: 100%;
       text-align: center;
       font-family: Courier;
       color: #33ff33;
   }
+  .maintext > a {
+      color: #33ff33;
+  }      
   
   @media (min-width: 480px) {
       .maintitle {
@@ -86,11 +89,16 @@ function nukeFrames() {
   }
 </style>
 </head>
-<body onLoad="nukeFrames() bgcolor="#000000">
+<body onLoad="nukeFrames()">
 
 <div class="maintext">
    <div class="maintitle">thoughtrights.com</div>
    <div class="subtitle"><a style="text-decoration:none" href="menu/index.html">&bull;</a> under renewed management <a style="text-decoration:none" href="menu/apple-IIe.html">&bull;</a></div>
+</div>
+
+<div class="maintext">
+  <p><a href="menu/">menu</a></p>
+  <p><a href="menu/apple-IIe.html">alt.retro.menu</a></p>
 </div>
 
 <div class="footer">
@@ -98,7 +106,7 @@ function nukeFrames() {
 <hr align="left" width="90%" noshade size=1>Founded on April 30 1995 - Last Modfied <!--#echo var="LAST_MODIFIED" --> - 
 <a href="mailto:wiz@thoughtrights.com">wiz@thoughtrights.com</a><br />
 <!--#config timefmt="%Y" -->
-<a href="copyright.shtml">Copyright</a> &copy;1995-<!--#echo var="DATE_LOCAL" -->
+<!--a href="copyright.shtml"-->Copyright<!-- /a --> &copy;1995-<!--#echo var="DATE_LOCAL" -->
 <a href="http://www.thoughtrights.com">Thoughtrights</a>.
 All rights reserved.
 </div>
