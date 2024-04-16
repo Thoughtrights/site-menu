@@ -43,6 +43,126 @@ body {
   place-items: center;
 }
 
+@keyframes flicker-2 {
+  0% {
+  opacity: 0.47861;
+  }
+  5% {
+  opacity: 0.54769;
+  }
+  10% {
+  opacity: 0.43604;
+  }
+  15% {
+  opacity: 1;
+  }
+  20% {
+  opacity: 0.38128;
+  }
+  25% {
+      opacity: 1;
+  }
+  30% {
+  opacity: 0.85583;
+  }
+  35% {
+  opacity: 0.87807;
+  }
+  40% {
+  opacity: 0.46559;
+  }
+  45% {
+      opacity: 1;
+  }
+  50% {
+      opacity: 1;
+  }
+  55% {
+  opacity: 0.28594;
+  }
+  60% {
+  opacity: 0.40313;
+  }
+  65% {
+  opacity: 0.91988;
+  }
+  70% {
+  opacity: 0.73455;
+  }
+  75% {
+  opacity: 0.57288;
+  }
+  80% {
+  opacity: 0.91428;
+  }
+  85% {
+  opacity: 0.90419;
+  }
+  90% {
+  opacity: 0.9003;
+  }
+  95% {
+  opacity: 0.56108;
+  }
+  100% {
+  opacity: 0.44387;
+  }
+}
+@keyframes turn-on {
+  0% {
+    transform: scale(1, 0.8) translate3d(0, 0, 0);
+    -webkit-filter: brightness(30);
+    filter: brightness(30);
+    opacity: 1;
+  }
+  3.5% {
+    transform: scale(1, 0.8) translate3d(0, 100%, 0);
+  }
+  3.6% {
+    transform: scale(1, 0.8) translate3d(0, -100%, 0);
+    opacity: 1;
+  }
+  9% {
+    transform: scale(1.3, 0.6) translate3d(0, 100%, 0);
+    -webkit-filter: brightness(30);
+    filter: brightness(30);
+    opacity: 0;
+  }
+  11% {
+    transform: scale(1, 1) translate3d(0, 0, 0);
+    -webkit-filter: contrast(0) brightness(0);
+    filter: contrast(0) brightness(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1, 1) translate3d(0, 0, 0);
+    -webkit-filter: contrast(1) brightness(1.2) saturate(1.3);
+    filter: contrast(1) brightness(1.2) saturate(1.3);
+    opacity: 1;
+  }
+}
+@keyframes turn-off {
+  0% {
+    transform: scale(1, 1.3) translate3d(0, 0, 0);
+    -webkit-filter: brightness(1);
+    background: #33ff33;
+    filter: brightness(1) hue-rotate(180deg);
+    opacity: 1;
+  }
+  60% {
+    transform: scale(1.3, 0.001) translate3d(0, 0, 0);
+    -webkit-filter: brightness(10);
+    background: #33ff33;
+    filter: brightness(10) hue-rotate(180deg);
+  }
+  100% {
+    animation-timing-function: cubic-bezier(0.755, 0.05, 0.855, 0.06);
+    transform: scale(0, 0.0001) translate3d(0, 0, 0);
+    -webkit-filter: brightness(50);
+    background: #33ff33;
+    filter: brightness(50) hue-rotate(180deg);
+  }
+}
 .bg {
   position: fixed;
   width: 100%;
@@ -51,26 +171,6 @@ body {
   background: linear-gradient(-145deg, #555, transparent 30%), linear-gradient(#bbb 30%, #aaa 60%, #bbb 65%, #fff);
 }
 
-.XXXh1-bg {
-  position: absolute;
-  font-family: "Cormorant Garamond", serif;
-  font-wight: 600;
-  font-size: 30vmin;
-  left: 105vmin;
-  top: 10vmin;
-  padding: 0;
-  margin: 0;
-  white-space: nowrap;
-  background: linear-gradient(#bbb, #fff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  mix-blend-mode: multiply;
-  letter-spacing: -0.5vmin;
-}
-.XXXh1-bg span {
-  font-size: 12vmin;
-  margin-left: -4vmin;
-}
 
 .🖥️ {
   position: absolute;
@@ -573,6 +673,8 @@ body {
   font-family: "Terminal";
   /* text-transform: uppercase; */
   /* We're using an 80 column card, so we can have lowercase. ;-) */
+  /*  animation: flicker 0.15s infinite; */
+  animation: flicker-2 0.005s infinite;
 }
 
 .monitor__terminal .cursor {
@@ -674,6 +776,7 @@ body {
   left: 7.95vmin;
   width: 43.8vmin;
   height: 27.75vmin;
+  z-index: 1;
   background-color: #4e654a;
   border-radius: 10%/95%;
   box-shadow: inset 0 0 10px #000000;
@@ -684,6 +787,7 @@ body {
   left: 9.75vmin;
   width: 40.05vmin;
   height: 30.3vmin;
+  z-index: 1;
   border-radius: 95%/10%;
   background: linear-gradient(217deg, rgba(78, 101, 74, 0), rgba(78, 101, 74, 0.9) 70.71%), linear-gradient(127deg, rgba(154, 189, 195, 0.8), #4e654a 70.71%), linear-gradient(336deg, rgba(78, 101, 74, 0.8), #4e654a 70.71%);
 }

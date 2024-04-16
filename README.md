@@ -43,12 +43,6 @@ swaps spaces for ' ' -- I believe that is because of font issues. This
 has gotten increasingly awkward as I moved things into
 commands-data.json. It will be part of a major refactoring.
 
-The monitor and drive are nice. The monitor could use a few small
-extra image elements but it is generally great. The drive is also
-pretty amazing, however it currently glitches and has zero depth on
-mobile devices. I should fix this or adapt the mobile view to exclude
-it.
-
 I made many bug fixes along the way. Many of these only became evident
 because I expanded the codebase as a means to a UI.
 
@@ -56,11 +50,6 @@ I effectively added the Apple IIe 80 Character Expansion Card; I gave
 it 80 columns, 64KB RAM, and lowercase characters.
 
 ## Future Work
-
-I'd like add some Z-index layers for CRT effects (cold turnOn, warm
-turnOff, and some steady-state CRT frame rate
-slowness. https://codepen.io/frbarbre/pen/BaObOXL has an excellent
-starting point. These were legit issues with the monitor.
 
 I'd like to add CORS-acceptable external web page layers inside the
 screen for `BRUN` programs.
@@ -73,19 +62,20 @@ I initially considered building a direct web interface to an Apple IIe
 emulator. However that's basically making a cloud-based Apple IIe and
 ... nuts. Additionally, the Linux ports are lacking.
 
-I made drive and computer lights flash. But I could add drive action
-sounds (plural), boot beeps, and syntax error noises.
+I made drive light activation, computer lights flash, and the CRT
+on/off/flicker. But I could add drive action sounds (plural), boot
+beeps, and syntax error noises.
 
 ## Conclusions
 
 Overall this was a fun little project that occupied me for two
-days. One of those days was until after midnight. I spent an amazing
-amount of time doing tiny only-I-would-notice things and very little
-time doing big things. It was a surprising amount of fun to make.
+days. Edit: Three for CRT effects. One of those days was until after
+midnight. I spent an amazing amount of time doing tiny
+only-I-would-notice things and very little time doing big things. It
+was a surprising amount of fun to make.
 
-I do think some CRT Z-index monitor artifacts would be
-neat. Displaying some embeddable website pages would go along with
-that pretty nicely.
+Displaying some embeddable website pages following a BRUN command
+would be pretty neat.
 
 
 ## Misc

@@ -166,18 +166,22 @@ document.addEventListener('DOMContentLoaded', () => {
 	    powerLight.style.boxShadow = POWER_ON_SHADOW;
 	    powerLight.style.backgroundColor = POWER_ON_COLOR;
 	    readFromFloppy(7);
+	    animateTerminalPowerOn(4);
 	    nukeTerminal();
 	    showData(bootPromData).then(() => {
 		nukeTerminal();
 		showData(introData).then(() => {
 		    booting = false;
 		    clearTerminal();
+		    animateTerminalFlicker();
 		});
 	    });
 	} else {
 	    powerLight.style.boxShadow = POWER_OFF_SHADOW;
 	    powerLight.style.backgroundColor = POWER_OFF_COLOR;
 	    /* Would be nice: animate the LCD fade instead of just zero'ng it */
+	    /* Something like: */
+	    animateTerminalPowerOff(0.55);
 	    setTimeout(() => nukeTerminal(), 500);
 	}
     });
@@ -420,11 +424,11 @@ function pushRedirect(url) {
 }
 
 function processCommand(command) {
-    command = command.toUpperCase().substring(1);
-    console.log("processCommand: " + command);
 
-    // we should drive this by some nice command.json that has command and data combined
-
+    command = command.substring(1);
+    if (command.length > 1) {
+	command = command.toUpperCase();
+    }
     if (command in commands) {
 	syntaxErrorCounter = 0;
 	// Before anything follow an alias if applicable
@@ -441,19 +445,13 @@ function processCommand(command) {
 		pushRedirect(commands[command]["payload"][0]);
 	    }, (1000 * REDIRECT_SECONDS));
 	}
-	//if (commands[command]["action"] == "redirect") {
-	  //  let tmpLink = commands[command]["payload"][0];
-	  //  let tmpArry = ['<a href=', tmpLink, '>LINK</a>']
-	  //  showArrayData(tmpArry);
-        //}
-	//DEBUGGG::: will need to handle redirects, reserved (syntax error?), add a POKE!, etc.
-	//would be cool to make BRUN operate inside the screen as an iframe or something -- behind the CRT effect (https://codepen.io/frbarbre/pen/BaObOXL)
+	// Would be interesting to allow for emulating basic in javacsript, though supporting POKE and graphics ...
+	// Would be cool to make BRUN operate inside the screen as an iframe or something
 	
     } else if (command == '') {
 	lines[++line] = ' ';
 	lines[++line] = ']';
     } else {
-	console.log(commands)
 	lines[++line] = ' ';
 	lines[++line] = '?SYNTAX ERROR';
 	if (++syntaxErrorCounter > MAX_SEQUENTIAL_SYNTAX_ERRORS) {
@@ -465,7 +463,17 @@ function processCommand(command) {
 	    
     }
 }
-
+function animateTerminalFlicker() {
+    terminal.style.animation = 'flicker-2 0.005s infinite';
+}
+function animateTerminalPowerOn(warmUp) {
+    terminal.style.animation = 'turn-on ' + warmUp.toString() + 's linear';
+    terminal.style.animationFillMode = 'forwards';
+}
+function animateTerminalPowerOff(coolDown) {
+    terminal.style.animation = 'turn-off ' + coolDown.toString() + 's cubic-bezier(0.23, 1, 0.32, 1)';
+    terminal.style.animationFillMode = 'forwards';
+}
 function animateKey(keyCode) {
   const key = document.querySelector(`.key-code--${keyCode}`);
   if (key) {
@@ -501,7 +509,7 @@ function render() {
 	    divLine.appendChild(cursor);
 	}
 	terminal.appendChild(divLine);
-  }
+    }
 }
 
 function readFromFloppy(ms) {
@@ -517,17 +525,6 @@ function readFromFloppy(ms) {
 }
 
 const bootPromData = '                                      Apple //e\n';
-
-const catalogData = " \n" +
-      "DISK VOLUME 254\n" +
-      " \n" +
-      " T 019 RESUME\n" +
-      " B 030 BARZY\n" +
-      " B 008 DAEMOUS\n" +
-      " I 040 SPOKENWORD\n" +
-      " A 002 FOODNET\n" +
-      " A 002 DUNGEONEER\n" +
-      " \n";
 
 const introData = " \n" +
       "CRACKED BY                   \n" +
