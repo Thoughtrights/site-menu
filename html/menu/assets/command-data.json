@@ -204,6 +204,16 @@
 	"action": "alias",
 	"payload": ["BRUN SEARCH"]
     },
+    "BRUN GOPHER" : {
+	"action": "program",
+	"type": "B",
+	"sectors": 41,
+	"payload": ["remote", "proxy/gopher.cgi"]
+    },
+    "RUN GOPHER" : {
+	"action": "alias",
+	"payload": ["BRUN GOPHER"]
+    },
     "HELP": {
 	"action": "print",
 	"payload": [" \n",

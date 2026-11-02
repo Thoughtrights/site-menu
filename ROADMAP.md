@@ -150,6 +150,61 @@ Options, roughly from least to most work:
    software you have the rights to share: public domain, homebrew, or titles
    whose authors have released them.
 
+### GOPHER (done)
+
+- [x] `BRUN GOPHER`: a gopher client on the disk, run by
+      `html/menu/proxy/gopher.cgi` on thoughtrights.com (a remote program).
+      Standard library Python, no paid services. Numbered menus, paged text,
+      gopher searches; `U` goes back, `M` to the main menu, `G gopher://...`
+      goes anywhere, `?` for help, `Q` to quit. Pictures and downloads are
+      `FILE TYPE MISMATCH`.
+- [x] It starts on a menu of gopher holes checked in November 2026:
+      Veronica-2 (search all of gopherspace), Gopherpedia (Wikipedia over
+      gopher, with search), Floodgap, SDF, quux.org's historic archives and
+      the Gopher Project, Bitreich, Circumlunar Space and the Zaibatsu,
+      gopher.icu, the Apple II Documentation Project and archive mirrors on
+      mirrors.apple2.org.za, Floodgap news feeds, Hacker News and MetaFilter.
+- [x] Text wrapped for 70 columns is reflowed on a 40 column screen; ASCII
+      art is cut rather than wrapped so it stays lined up.
+- [x] Safety: POST only, only from the menu's own pages (Origin), 30
+      requests a minute per visitor, a 10 minute cache, gopher port 70 only,
+      public addresses only (no 127.0.0.1, no EC2 metadata at
+      169.254.169.254), 512KB and 15 seconds per fetch.
+- [x] Tests: `python3 -m unittest discover tests` (no network needed).
+- [x] Local: `python3 tools/dev-server.py`, then
+      http://localhost:8765/menu/apple-IIe.html runs the CGI as Apache would.
+
+WAIS: no public WAIS servers are known to be running any more. Gopher's own
+search items (Veronica-2, Gopherpedia) are the period equivalent.
+
+Deploying the proxy (a server step, not done):
+
+- Copy `html/menu/proxy/gopher.cgi` with its execute bit.
+- Apache needs `mod_cgi` (`a2enmod cgi`) and, for that directory,
+  `Options +ExecCGI` and `AddHandler cgi-script .cgi`, as dungeoneer's
+  `.api` scripts already have.
+- Outbound TCP port 70 from the EC2 instance (the default security group
+  allows all outbound).
+- If the page is served from other origins than `https://www.thoughtrights.com`
+  and `https://thoughtrights.com`, `SetEnv GOPHER_ALLOWED_ORIGINS "..."`.
+  `GOPHER_STATE_DIR` moves the cache and rate files from `/tmp`.
+- Floodgap blocks web proxies that let crawlers through, and already blocks
+  `*.amazonaws.*` hosts from its Groundhog weather pages (left off the home
+  menu for that reason). If the EC2 address gets blocked, Floodgap asks for
+  an email to gopher@floodgap.com explaining the proxy.
+
+### Emulator (TODO)
+
+- [ ] A real Apple IIe emulator in the monitor, as `BRUN EMULATOR` or a boot
+      option. apple2js (Apple ][ and //e in the browser, listed as MIT)
+      would run entirely in the visitor's browser: no server, no fees.
+- [ ] Apple's ROMs are Apple's copyright; decide whether to ship them.
+- [ ] Only disk images that may be shared: public domain, homebrew, or
+      released by their authors.
+- [ ] Desktop emulators to compare against: MAME (`apple2e`) and microM8 on
+      Ubuntu and macOS; MII and AppleWin's Linux port on Ubuntu; Virtual ][,
+      Mariani and Clock Signal on macOS.
+
 ### Discord-style tools from `~/src/character`
 
 The character system's APIs already return generated content as JSON for the
@@ -205,24 +260,19 @@ screen, like Lynx on a shell account in 1995.
 - Text arrives at modem speed.
 - Your own pages (resume, Barzy, spoken word) are same-origin and need no
   proxy. Wikipedia's API allows cross-origin requests and returns plain text.
-- Anything else needs a small server-side proxy, because the site is static
-  and browsers block cross-origin fetches. A serverless function (for example
-  a Cloudflare Worker) that fetches only allowlisted URLs, strips them to text
-  and caches them. It must stay allowlisted so it can't be used as an open
-  proxy.
+- Anything else goes through the proxy on the EC2 server (like
+  `gopher.cgi`), because browsers block cross-origin fetches: fetch only
+  allowlisted URLs, strip them to text and cache them, so it can't be used as
+  an open proxy.
 
 ### Google
 
 A text interface to google.com itself isn't workable: Google's terms forbid
 automated access to its search pages, it answers scrapers with CAPTCHAs, and
 its Custom Search JSON API is closed to new customers and shuts down on
-January 1, 2027. Options for a remote `SEARCH`-style program on the proxy:
-
-- Brave Search API: whole-web results as JSON; paid per query (check
-  current pricing). The key stays on the proxy.
-- Google's Programmable Search Element: free, but only for up to 50 chosen
-  domains, and it is an embedded widget, not JSON.
-- Wikipedia: what `BRUN SEARCH` already does, free.
+January 1, 2027. Paid search APIs are ruled out (no fees beyond the EC2
+hosting), so search is Wikipedia (`BRUN SEARCH`) and gopher's own searches,
+Veronica-2 and Gopherpedia (`BRUN GOPHER`).
 
 ## 7. Making it feel special
 
