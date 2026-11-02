@@ -108,6 +108,36 @@ Simulate a Hayes-compatible modem on a serial card in slot 2.
 
 ## 5. Programs and games
 
+### Programs on the disk (done)
+
+- [x] `CATALOG` is generated from `command-data.json`: any entry with a
+      `"type"` (and optional `"sectors"`, `"locked"`) is a file on the disk,
+      in file order. An entry without a type still works but doesn't show,
+      so hidden files are possible.
+- [x] `"action": "program"` runs a program that takes over the prompt until
+      it exits. Programs live in `js/apple-IIe-programs.js`. Ctrl-C or power
+      off breaks them; a network failure prints DOS's `I/O ERROR`.
+- [x] `BRUN SEARCH`: Wikipedia search and articles as text, word-wrapped to
+      40/80 columns and paged with `MORE?`. Runs in the browser, no proxy.
+- [x] `"payload": ["remote", "<url>"]`: a program that runs on a server,
+      such as the thoughtrights.com proxy. Adding one needs only a catalog
+      entry. Tested against a local mock; no real proxy exists yet.
+
+The remote protocol (one POST of JSON per line typed; the server keeps no
+session):
+
+```
+request:  { "input": null | "typed line", "state": <last reply's state>,
+            "columns": 40 | 80, "rows": 23 }
+reply:    { "print": ["lines", ...], "prompt": "SEARCH? ",
+            "state": { ... }, "exit": false }
+```
+
+The server must send CORS headers allowing `https://www.thoughtrights.com`
+(and answer the `OPTIONS` preflight), unless it is served from the same
+origin as the page.
+
+
 Options, roughly from least to most work:
 
 1. Small original programs written in JS that run inside the terminal: text
@@ -180,6 +210,19 @@ screen, like Lynx on a shell account in 1995.
   a Cloudflare Worker) that fetches only allowlisted URLs, strips them to text
   and caches them. It must stay allowlisted so it can't be used as an open
   proxy.
+
+### Google
+
+A text interface to google.com itself isn't workable: Google's terms forbid
+automated access to its search pages, it answers scrapers with CAPTCHAs, and
+its Custom Search JSON API is closed to new customers and shuts down on
+January 1, 2027. Options for a remote `SEARCH`-style program on the proxy:
+
+- Brave Search API: whole-web results as JSON; paid per query (check
+  current pricing). The key stays on the proxy.
+- Google's Programmable Search Element: free, but only for up to 50 chosen
+  domains, and it is an embedded widget, not JSON.
+- Wikipedia: what `BRUN SEARCH` already does, free.
 
 ## 7. Making it feel special
 

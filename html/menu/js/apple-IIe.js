@@ -51,6 +51,14 @@ let on = false;
 let booting = false;
 let line = 0;
 const lines = [' '];
+let promptText = ']';     // DOS's prompt, or the running program's
+
+// A program from the disk (see apple-IIe-programs.js) gets each line
+// typed at its prompt until it exits. Ctrl-C or power off ends it, which
+// bumps programToken so anything it was still waiting for is ignored.
+let program = null;
+let programToken = 0;
+let working = false;      // the program is waiting on the network
 
 // Timers that belong to the running machine. Power off cancels them all.
 let output = null;        // the listing being printed, if any
@@ -327,15 +335,15 @@ function setUpPhone() {
 
     // The text field holds the line being typed; the screen mirrors it.
     phoneInput.addEventListener('input', () => {
-	if (!on || booting || output) {
-	    phoneInput.value = ''; // the machine is off or busy printing
+	if (!acceptingInput()) {
+	    phoneInput.value = ''; // the machine is off or busy
 	    return;
 	}
 	const typed = phoneInput.value
 	      .replace(/[‘’]/g, "'").replace(/[“”]/g, '"') // phones "smarten" quotes
 	      .replace(/[^\x20-\x7e]/g, '')
-	      .slice(0, MAX_INPUT_LENGTH - 1);
-	lines[line] = ']' + typed;
+	      .slice(0, MAX_INPUT_LENGTH - promptText.length);
+	lines[line] = promptText + typed;
 	render();
     });
 
@@ -343,7 +351,7 @@ function setUpPhone() {
     phoneKeyboard.addEventListener('submit', (event) => {
 	event.preventDefault();
 	phoneInput.value = '';
-	if (on && !booting && !output) {
+	if (acceptingInput()) {
 	    processCommand(lines[line]);
 	    render();
 	}
@@ -460,7 +468,7 @@ function nukeTerminal() {
 function clearTerminal() {
     terminal.innerHTML = '';
     lines.length = 0;
-    lines.push(']');
+    lines.push(promptText);
     line = 0;
     render();
 }
@@ -583,17 +591,33 @@ function loadCommands(location) {
     return loaded;
 }
 
+function catalogEntries() {
+    // Every command with a "type" is a file on the disk, listed in the
+    // order it appears in command-data.json. A command without one still
+    // works; it just doesn't show up in CATALOG.
+    return Object.keys(commands)
+	.filter((name) => commands[name]["type"])
+	.map((name) => ({
+	    name: name.split(' ').slice(1).join(' '),
+	    type: commands[name]["type"],
+	    sectors: commands[name]["sectors"] || 2,
+	    locked: Boolean(commands[name]["locked"]),
+	}));
+}
+
+function catalogListing(volume) {
+    // As DOS 3.3 printed it: lock, type, size in sectors, name.
+    return [' ', 'DISK VOLUME ' + volume, ' ',
+	    ...catalogEntries().map((file) =>
+		(file.locked ? '*' : ' ') + file.type + ' ' +
+		    String(file.sectors % 1000).padStart(3, '0') + ' ' + file.name),
+	    ' '];
+}
+
 function diskFiles() {
-    // Every file the disk knows about: the CATALOG listing plus the
-    // NAME in any "VERB NAME" command.
-    const files = new Set();
-    const catalog = commands['CATALOG'] ? commands['CATALOG']['payload'] : [];
-    for (const entry of catalog) {
-	const match = toScreenText(entry).match(/^\s*\*?[TIABSR]\s+\d{3}\s+(.+?)\s*$/);
-	if (match) {
-	    files.add(normalizeCommand(match[1]));
-	}
-    }
+    // Every file the disk knows about: the CATALOG plus the NAME in any
+    // "VERB NAME" command.
+    const files = new Set(catalogEntries().map((file) => file.name));
     for (const name in commands) {
 	const [verb, ...rest] = name.split(' ');
 	if (rest.length && DOS_FILE_VERBS.includes(verb)) {
@@ -650,25 +674,16 @@ document.addEventListener('keydown', (event) => {
 	event.preventDefault();
     }
 
-    if (!on || booting || output) {
-	return; // the machine is off or busy printing
+    if (!acceptingInput()) {
+	return; // the machine is off or busy
     }
 
     if (isPrintable) {
 	if (keycode === BACKSPACE) {
-	    if (lines[line].length <= 1 && line > 0) {
-
-	      // If you want to allow for deleting and moving up to a
-	      // previous line then this will do it. I am not allowing
-	      // for "word processing" or something that calls for
-	      // this.
-
-	      // lines.pop();
-	      // line--;
-
-	    } else {
-		const length = lines[line].length - 1;
-		lines[line] = lines[line].slice(0, Math.max(1, length));
+	    // Stop at the prompt. Deleting back onto a previous line would
+	    // need "word processing" this doesn't do.
+	    if (lines[line].length > promptText.length) {
+		lines[line] = lines[line].slice(0, -1);
 	    }
 	} else if (keycode === ENTER) {
 	    // WHAT WE GOT?
@@ -685,20 +700,25 @@ function pushRedirect(url) {
     window.location = url;
 }
 
+function acceptingInput() {
+    return on && !booting && !output && !working;
+}
+
 function controlC() {
-    /* Ctrl-C breaks a listing or a pending redirect. */
+    /* Ctrl-C breaks a listing, a running program or a pending redirect. */
     if (booting) {
 	return;
     }
-    if (output) {
+    if (output || program) {
 	cancelOutput();
+	endProgram();
     } else if (redirectTimer) {
 	clearTimeout(redirectTimer);
 	redirectTimer = null;
     } else {
 	return;
     }
-    lines.push(' ', 'BREAK', ']');
+    lines.push(' ', 'BREAK', promptText);
     line = lines.length - 1;
     render();
 }
@@ -721,20 +741,108 @@ function showError(message) {
 	showArrayData(commands["HELP"]["payload"]);
 	syntaxErrorCounter = 0;
     } else {
-	lines[++line] = ']';
+	lines[++line] = promptText;
     }
+}
+
+function makeMachine(token) {
+    /* What a program may do. Once it has been broken off (Ctrl-C, power
+     * off, another program) its token is stale and all of this is
+     * ignored, so a late network reply can't print. */
+    const alive = () => token === programToken;
+    return {
+	columns: () => columns,
+	rows: () => MAX_ROWS + 1,
+	setPrompt(text) {
+	    if (alive()) {
+		promptText = text;
+	    }
+	},
+	print(textLines) {
+	    // Prints the lines, then the prompt.
+	    return alive() ? showArrayData(textLines) : new Promise(() => {});
+	},
+	work(promise) {
+	    // Wait for the network with the drive light on and input off.
+	    if (!alive()) {
+		return promise;
+	    }
+	    working = true;
+	    readFromFloppy(60);
+	    return promise.finally(() => {
+		if (alive()) {
+		    working = false;
+		    stopFloppy();
+		}
+	    });
+	},
+	exit() {
+	    // Back to DOS. A print after this still shows, ending in "]".
+	    if (alive()) {
+		program = null;
+		promptText = ']';
+	    }
+	},
+    };
+}
+
+function endProgram() {
+    programToken++;
+    program = null;
+    if (working) {
+	stopFloppy(); // broken off while it waited on the network
+    }
+    working = false;
+    promptText = ']';
+}
+
+function runProgramStep(step) {
+    // A program that fails prints DOS's I/O ERROR and keeps its prompt.
+    const token = programToken;
+    Promise.resolve().then(step).catch((error) => {
+	console.log(error);
+	if (token === programToken) {
+	    working = false;
+	    stopFloppy();
+	    showArrayData([' ', 'I/O ERROR', ' ']);
+	}
+    });
+}
+
+function startProgram(name, args) {
+    if (!(name in PROGRAMS)) {
+	showError('FILE NOT FOUND');
+	return;
+    }
+    endProgram();
+    program = PROGRAMS[name](makeMachine(programToken), ...args);
+    runProgramStep(() => program.start());
 }
 
 function processCommand(command) {
 
-    command = normalizeCommand(command.substring(1));
+    command = command.substring(promptText.length);
+    if (program) {
+	const current = program;
+	runProgramStep(() => current.input(command));
+	return;
+    }
+
+    command = normalizeCommand(command);
     const resolved = resolveCommand(command);
     const action = resolved ? commands[resolved]["action"] : null;
 
-    if (action == "print" || action == "redirect") {
+    if (["print", "redirect", "catalog", "program"].includes(action)) {
 	syntaxErrorCounter = 0;
 	if (action == "print") {
 	    showArrayData(commands[resolved]["payload"]);
+	}
+	if (action == "catalog") {
+	    showArrayData(catalogListing(commands[resolved]["volume"] || 254));
+	}
+	if (action == "program") {
+	    const [name, ...args] = commands[resolved]["payload"];
+	    startProgram(name, args);
 	}
 	if (action == "redirect") {
 	    showArrayData([' ', 'CONFIRMED', ' ', 'You will be redirected in ' + REDIRECT_SECONDS.toString() + ' seconds.',
@@ -750,7 +858,7 @@ function processCommand(command) {
 
     } else if (command == '') {
 	lines[++line] = ' ';
-	lines[++line] = ']';
+	lines[++line] = promptText;
     } else {
 	// "reserved" entries (the boot text) are not commands you can type.
 	const [verb, ...rest] = command.split(' ');
@@ -836,6 +944,7 @@ function stopFloppy() {
 function stopMachine() {
     /* Power off: stop printing, forget any pending redirect, stop the drive. */
     cancelOutput();
+    endProgram();
     booting = false;
     clearTimeout(redirectTimer);
     redirectTimer = null;
@@ -886,7 +995,7 @@ function showArrayData(dataLines) {
 	output = setInterval(() => {
 	    if (!tmpDataLines.length) {
 		cancelOutput();
-		lines.push(']');
+		lines.push(promptText);
 		line++;
 		render();
 		resolve();
