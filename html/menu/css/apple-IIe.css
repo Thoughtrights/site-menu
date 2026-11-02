@@ -30,8 +30,13 @@
   font-family: "Terminal";
   src: url("../assets/apple-IIe-80col.ttf");
 }
+@font-face {
+  font-family: "Terminal40";
+  src: url("../assets/apple-IIe-40col.ttf");
+}
 html {
   width: 100%;
+  overflow: hidden; /* the scene is scaled to fit; never scroll */
 }
 
 body {
@@ -39,6 +44,7 @@ body {
   padding: 0;
   width: 100%;
   height: 100vh;
+  overflow: hidden;
   display: grid;
   place-items: center;
 }
@@ -173,7 +179,11 @@ body {
 
 
 .🖥️ {
-  position: absolute;
+  /* fixed, so the parts sticking out don't widen the page;
+     fitScene() in the JS scales and centers it */
+  position: fixed;
+  left: 0;
+  top: 0;
   width: 100vmin;
   height: 100vmin;
   perspective: 80vmin;
@@ -671,6 +681,7 @@ body {
   font-size: 1vmin;
   color: #33ff33;
   font-family: "Terminal";
+  white-space: pre; /* keep runs of spaces; long lines are wrapped in JS */
   /* text-transform: uppercase; */
   /* We're using an 80 column card, so we can have lowercase. ;-) */
   /*  animation: flicker 0.15s infinite; */
@@ -854,4 +865,68 @@ body {
   width: 1vmin;
   height: 1vmin;
   background-image: url("../assets/apple-filled.svg");
+}
+
+/* Phones and tablets: after the zoom, the screen fills what is visible
+   above the phone keyboard. The JS moves the terminal in here and sets
+   the size variables. */
+.phone-screen {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 45%, #50684c 0%, #3e553b 55%, #1f2c1e 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease-in;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.phone-screen::after {
+  /* scan lines */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.14) 0, rgba(0, 0, 0, 0.14) 1px, transparent 1px, transparent 3px);
+}
+body.screen-on .phone-screen {
+  opacity: 1;
+  pointer-events: auto;
+}
+.phone-screen .monitor__terminal {
+  flex: none;
+  width: var(--terminal-width);
+  height: var(--terminal-height);
+  padding: 0;
+  font-family: var(--terminal-font);
+  font-size: var(--terminal-font-size);
+  line-height: var(--terminal-line-height);
+  text-shadow: 0 0 0.35em rgba(51, 255, 51, 0.55);
+}
+.phone-screen .monitor__terminal .cursor {
+  width: 0.8em;
+  height: 0.8em;
+  margin: 0.1em;
+}
+.phone-keyboard {
+  /* invisible, but focusable so the phone keyboard comes up */
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+.phone-keyboard input {
+  font-size: 16px; /* smaller makes iOS zoom the page on focus */
+  caret-color: transparent;
 }
