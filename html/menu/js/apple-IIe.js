@@ -28,6 +28,7 @@ const POWER_BUTTON_ALERT_SECONDS_STOP = 120; // just stop any alert if they have
 const DOS_FILE_VERBS = ['RUN', 'BRUN', 'OPEN', 'LOAD', 'BLOAD', 'EXEC', 'READ'];
 const DESK_PARTS = '.monitor, .keyboard, .keyboard *, .floppy-drive, .floppy-drive *';
 const ZOOM_SECONDS = 1.4;
+const FLICKER_WARM_UP_SECONDS = 60; // then the screen only flickers once a minute
 const PHONE_LINE_HEIGHT = 1.2;
 const PHONE_80_COLUMN_WIDTH = 640; // narrower screens get the 40 column display
 
@@ -65,6 +66,7 @@ let output = null;        // the listing being printed, if any
 let redirectTimer = null;
 let powerOffTimer = null;
 let floppyTimer = null;
+let flickerTimer = null;
 
 const keys = [
   { key: 'Esc', key2: '', keyCode: 27 },
@@ -870,7 +872,12 @@ function processCommand(command) {
     }
 }
 function animateTerminalFlicker() {
+    /* Flicker hard while the set warms up, then only once a minute. */
     terminal.style.animation = 'flicker-2 0.005s infinite';
+    clearTimeout(flickerTimer);
+    flickerTimer = setTimeout(() => {
+	terminal.style.animation = 'flicker-once-a-minute 60s infinite';
+    }, FLICKER_WARM_UP_SECONDS * 1000);
 }
 function animateTerminalPowerOn(warmUp) {
     terminal.style.animation = 'turn-on ' + warmUp.toString() + 's linear';
@@ -948,6 +955,7 @@ function stopMachine() {
     booting = false;
     clearTimeout(redirectTimer);
     redirectTimer = null;
+    clearTimeout(flickerTimer); // or it would cut short the power-off fade
     stopFloppy();
 }
 

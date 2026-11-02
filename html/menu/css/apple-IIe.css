@@ -114,6 +114,32 @@ body {
   opacity: 0.44387;
   }
 }
+/* Once the set has warmed up: steady, with a 0.6s flicker at the end of
+ * each minute. Run as `flicker-once-a-minute 60s infinite`. */
+@keyframes flicker-once-a-minute {
+  0%, 98.9% { opacity: 1; animation-timing-function: steps(1, end); }
+  98.95% { opacity: 0.47861; animation-timing-function: steps(1, end); }
+  99% { opacity: 0.54769; animation-timing-function: steps(1, end); }
+  99.05% { opacity: 0.43604; animation-timing-function: steps(1, end); }
+  99.1% { opacity: 1; animation-timing-function: steps(1, end); }
+  99.15% { opacity: 0.38128; animation-timing-function: steps(1, end); }
+  99.2% { opacity: 1; animation-timing-function: steps(1, end); }
+  99.25% { opacity: 0.85583; animation-timing-function: steps(1, end); }
+  99.3% { opacity: 0.87807; animation-timing-function: steps(1, end); }
+  99.35% { opacity: 0.46559; animation-timing-function: steps(1, end); }
+  99.4% { opacity: 1; animation-timing-function: steps(1, end); }
+  99.5% { opacity: 0.28594; animation-timing-function: steps(1, end); }
+  99.55% { opacity: 0.40313; animation-timing-function: steps(1, end); }
+  99.6% { opacity: 0.91988; animation-timing-function: steps(1, end); }
+  99.65% { opacity: 0.73455; animation-timing-function: steps(1, end); }
+  99.7% { opacity: 0.57288; animation-timing-function: steps(1, end); }
+  99.75% { opacity: 0.91428; animation-timing-function: steps(1, end); }
+  99.8% { opacity: 0.90419; animation-timing-function: steps(1, end); }
+  99.9% { opacity: 0.56108; animation-timing-function: steps(1, end); }
+  99.95% { opacity: 0.44387; animation-timing-function: steps(1, end); }
+  100% { opacity: 1; }
+}
+
 @keyframes turn-on {
   0% {
     transform: scale(1, 0.8) translate3d(0, 0, 0);
