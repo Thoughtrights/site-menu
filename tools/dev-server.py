@@ -3,8 +3,10 @@
 
     python3 tools/dev-server.py [port]     (default 8765)
 
-Then open http://localhost:8765/menu/apple-IIe.html. The gopher proxy
-is told to accept this origin and keeps its cache in /tmp.
+Then open http://localhost:8765/menu/apple-IIe.html, or from a phone on
+the same network, http://<this machine's address>:8765/menu/apple-IIe.html.
+The gopher proxy is told to accept whichever of these the page came
+from and keeps its cache in /tmp.
 """
 
 import http.server
@@ -27,13 +29,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_error(404)
             return
         body = self.rfile.read(int(self.headers.get('Content-Length') or 0))
+        # Accept the page wherever it was loaded from: localhost, or this
+        # machine's LAN address when testing from a phone.
+        origins = {'http://localhost:%d' % PORT, 'http://127.0.0.1:%d' % PORT}
+        if self.headers.get('Host'):
+            origins.add('http://' + self.headers['Host'])
         env = dict(os.environ,
                    REQUEST_METHOD='POST',
                    CONTENT_LENGTH=str(len(body)),
                    CONTENT_TYPE=self.headers.get('Content-Type', ''),
                    HTTP_ORIGIN=self.headers.get('Origin', ''),
                    REMOTE_ADDR=self.client_address[0],
-                   GOPHER_ALLOWED_ORIGINS='http://localhost:%d http://127.0.0.1:%d' % (PORT, PORT))
+                   GOPHER_ALLOWED_ORIGINS=' '.join(sorted(origins)))
         result = subprocess.run([sys.executable, path], input=body, env=env,
                                 capture_output=True, timeout=60)
         head, _, payload = result.stdout.partition(b'\r\n\r\n')
