@@ -68,6 +68,20 @@ class ParsingTest(unittest.TestCase):
         self.assertTrue(all(len(row) <= 40 for row in rows))
         self.assertEqual(' '.join(rows), ' '.join(wide))
 
+    def test_list_items_keep_their_own_lines(self):
+        wide = ['Visits per state, territory, or foreign country he traveled to:',
+                '* Domestic:',
+                '** One: Alabama, California, Connecticut, Illinois, Mississippi,',
+                'Montana, Nebraska, North Dakota',
+                '**Four: Georgia',
+                '1. First',
+                '- Second']
+        rows = gopher.text_rows(wide, 40)
+        starts = [row for row in rows if row[0] in '*1-']
+        self.assertEqual(starts, ['* Domestic:', '** One: Alabama, California,',
+                                  '**Four: Georgia', '1. First', '- Second'])
+        self.assertIn('Montana', ' '.join(rows))
+
     def test_rules_are_cut(self):
         self.assertEqual(gopher.text_rows(['=' * 70], 40), ['=' * 40])
 

@@ -275,6 +275,9 @@ def text_rows(lines, columns):
         elif line.startswith(' ') and not paragraph:  # indented on its own
             flush()
             rows.extend(wrap(line, columns))
+        elif re.match(r'[*#]+|[-+] |\d+[.)] ', bare):  # a list item starts a new line
+            flush()
+            paragraph.append(bare)
         else:
             paragraph.append(bare)
     flush()
