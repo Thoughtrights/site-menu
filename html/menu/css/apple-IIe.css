@@ -1005,3 +1005,28 @@ body.zoomed .zoom-toggle .zoom-toggle__out {
     display: none; /* phones zoom in on their own */
   }
 }
+
+/* A brief note, in the same plastic as the zoom toggle. */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 950;
+  padding: 10px 16px;
+  border: 1px solid #9c978a;
+  border-top: 2px solid #f4f1e8;
+  border-radius: 4px;
+  background: linear-gradient(145deg, #e7e4d9, #c9c5b8);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  color: #3a372f;
+  font: 15px/1.3 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.toast--shown {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}

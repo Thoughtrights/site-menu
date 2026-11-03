@@ -29,6 +29,7 @@ const DOS_FILE_VERBS = ['RUN', 'BRUN', 'OPEN', 'LOAD', 'BLOAD', 'EXEC', 'READ'];
 const DESK_PARTS = '.monitor, .keyboard, .keyboard *, .floppy-drive, .floppy-drive *';
 const ZOOM_SECONDS = 1.4;
 const FLICKER_WARM_UP_SECONDS = 60; // then the screen only flickers once a minute
+const TOAST_SECONDS = 2.5;
 const PHONE_LINE_HEIGHT = 1.2;
 const PHONE_80_COLUMN_WIDTH = 640; // narrower screens get the 40 column display
 
@@ -39,6 +40,7 @@ const touchMode = window.matchMedia('(hover: none) and (pointer: coarse)').match
 let screenMode = false;
 let zoomed = false;     // desktop: leaning in to the monitor
 let zoomToggle = null;
+let toastTimer = null;
 let columns = MAX_LINE_LENGTH;
 
 // could also do this in CSS
@@ -193,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
 	zoomToggle = document.querySelector('.zoom-toggle');
 	zoomToggle.addEventListener('click', () => {
-	    setZoomed(!zoomed);
+	    toggleZoom();
 	    zoomToggle.blur(); // so the space bar and RETURN keep typing
 	});
 	document.querySelector('.monitor').addEventListener('dblclick', (event) => {
@@ -201,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		return;
 	    }
 	    window.getSelection().removeAllRanges(); // a double-click selects a word
-	    setZoomed(!zoomed);
+	    toggleZoom();
 	});
     }
 
@@ -337,6 +339,25 @@ function zoomToScreen(seconds) {
 function zoomToMonitor(seconds) {
     /* Desktop: the screen and its bezel fill the window. */
     setSceneToFit('.monitor__inner', Infinity, 0.04, seconds);
+}
+
+function toggleZoom() {
+    /* Desktop: the zoom toggle and a double-click on the monitor. There
+     * is nothing to lean in to until the machine is on, and finding the
+     * power switch is part of it. */
+    if (!zoomed && !on) {
+	showToast('Turn the computer on first.');
+	return;
+    }
+    setZoomed(!zoomed);
+}
+
+function showToast(text) {
+    const toast = document.querySelector('.toast');
+    toast.textContent = text;
+    toast.classList.add('toast--shown');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('toast--shown'), TOAST_SECONDS * 1000);
 }
 
 function setZoomed(zoom) {
