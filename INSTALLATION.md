@@ -256,11 +256,17 @@ proxy to accept `localhost` as an origin, so `BRUN GOPHER` works against the
 real gopher servers. In the Claude desktop app, a `site` entry in
 `.claude/launch.json` starts the same server.
 
-The proxy tests don't use the network:
+The tests cover the proxy and check that the catalog, its programs and the
+files they need all fit together. They don't use the network:
 
 ```bash
 python3 -m unittest discover tests
 ```
+
+GitHub Actions runs them on every pull request and every push to `master`, and
+also checks that the JavaScript parses (`.github/workflows/checks.yml`). A
+`boot` entry whose disk you've chosen not to ship must be listed in
+`DISKS_NOT_SHIPPED` in `tests/test_site.py`.
 
 To try phone mode, open the page in a phone-sized window with touch
 emulation, such as a browser's device toolbar. Phone mode only switches on

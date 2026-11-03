@@ -207,14 +207,11 @@ The code grew from a 3D model into a UI. Before the bigger features:
 
 ## Deployment (CI/CD)
 
-Deploys are by hand today, and the live site doesn't have the programs, the
-gopher proxy, Zork or the //e yet. A path from merge to the live site, with no
-fees beyond the EC2 hosting:
+Pull requests are checked by GitHub Actions (`.github/workflows/checks.yml`),
+but deploys are by hand, and the live site doesn't have the programs, the gopher
+proxy, Zork or the //e yet. A path from merge to the live site, with no fees
+beyond the EC2 hosting:
 
-- [ ] **Checks on every pull request** with GitHub Actions: the proxy tests
-      (`python3 -m unittest discover tests`), `node --check` on the JS, and
-      `command-data.json` parses, with every `boot` disk and Zork story file it
-      names present (except a disk we've chosen not to ship).
 - [ ] **Deploy on merge to `master`:** rsync `html/menu/` to the server, keeping
       the execute bit on `gopher.cgi` and skipping editor backups.
 - [ ] **Decide how it reaches the server.** Either:

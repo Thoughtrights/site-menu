@@ -1,0 +1,25 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Proxy and site tests
+        run: python3 -m unittest discover tests
+
+      - name: JavaScript parses
+        run: |
+          for file in html/menu/js/*.js; do
+            node --check "$file"
+          done
