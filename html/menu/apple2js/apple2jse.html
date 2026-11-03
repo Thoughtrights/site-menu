@@ -43,6 +43,23 @@
   #display, .apple2e #display, .overscan { position: absolute; inset: 0; margin: 0; padding: 0; width: auto; height: auto; border: 0; border-radius: 0; background: #000; box-shadow: none; }
   #screen { width: 100% !important; height: 100% !important; cursor: default; }
 </style>
+<script>
+  // On a real //e the DELETE key sends 127, which INPUT ignores; only the
+  // left arrow backs up. Backspace is what people reach for now, so it
+  // sends the left arrow. Ctrl-Backspace is still a true DELETE.
+  for (const type of ['keydown', 'keyup']) {
+    window.addEventListener(type, (event) => {
+      if (event.key !== 'Backspace' || event.ctrlKey) {
+        return;
+      }
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      const left = new KeyboardEvent(type, { key: 'ArrowLeft', bubbles: true, cancelable: true });
+      Object.defineProperty(left, 'keyCode', { get: () => 37 });
+      window.dispatchEvent(left);
+    }, true);
+  }
+</script>
 </head>
 <body class="apple2e"
       ondragover="Apple2.handleDragOver(0, event)"
