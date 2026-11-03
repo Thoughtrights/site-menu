@@ -189,9 +189,30 @@ There's nothing to build after editing it; just deploy the file again.
 - **Catalog entries:** an entry with `"type"` (`T`, `B`, `A` or `I`) and
   `"sectors"` appears in `CATALOG`.
 - **Actions:** `"action"` is one of `print`, `redirect`, `catalog`,
-  `program` or `alias`. An alias's payload names the command it stands for.
+  `program`, `boot` or `alias`. An alias's payload names the command it stands
+  for.
   The two `reserved` entries hold the boot text and can't be typed.
 - **Remote programs:** a `program` entry with payload
   `["remote", "<url>"]` runs a remote program. The page POSTs each line to
   that URL. ROADMAP.md, under "Programs on the disk", describes the JSON it
   sends and expects back, for anyone writing another one.
+
+### Real //e disks
+
+`"action": "boot"` entries boot a disk image in a real Apple //e
+(apple2js, in `html/menu/apple2js/`) that takes over the monitor. Images
+live in `html/menu/assets/disks/` and are plain files, so deploying them is
+the same `rsync` as the rest of the menu. `.dsk`, `.do` and `.po` work.
+
+`BRUN CASTLE WOLFENSTEIN` expects `assets/disks/castle-wolfenstein.dsk`,
+which isn't in the repository; until it's there, the command prints
+`I/O ERROR`. To add another disk, copy the file in and add an entry like:
+
+```json
+"BRUN MY GAME" : {
+	"action": "boot",
+	"type": "B",
+	"sectors": 140,
+	"payload": ["assets/disks/my-game.dsk"]
+}
+```

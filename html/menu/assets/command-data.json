@@ -252,6 +252,44 @@
 	"action": "alias",
 	"payload": ["BRUN ZORK I"]
     },
+    "RUN EAMON" : {
+	"action": "boot",
+	"type": "A",
+	"sectors": 48,
+	"payload": ["assets/disks/eamon-001-main-hall.dsk"]
+    },
+    "BRUN EAMON" : {
+	"action": "alias",
+	"payload": ["RUN EAMON"]
+    },
+    "BRUN PRODOS" : {
+	"action": "boot",
+	"type": "B",
+	"sectors": 280,
+	"payload": ["assets/disks/prodos-2.4.3.po"]
+    },
+    "RUN PRODOS" : {
+	"action": "alias",
+	"payload": ["BRUN PRODOS"]
+    },
+    "PR#6" : {
+	"action": "alias",
+	"payload": ["BRUN PRODOS"]
+    },
+    "BRUN CASTLE WOLFENSTEIN" : {
+	"action": "boot",
+	"type": "B",
+	"sectors": 120,
+	"payload": ["assets/disks/castle-wolfenstein.dsk"]
+    },
+    "RUN CASTLE WOLFENSTEIN" : {
+	"action": "alias",
+	"payload": ["BRUN CASTLE WOLFENSTEIN"]
+    },
+    "BRUN WOLFENSTEIN" : {
+	"action": "alias",
+	"payload": ["BRUN CASTLE WOLFENSTEIN"]
+    },
     "HELP": {
 	"action": "print",
 	"payload": [" \n",

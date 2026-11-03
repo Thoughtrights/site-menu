@@ -48,6 +48,7 @@ let screenMode = false;
 let zoomed = false;     // desktop: leaning in to the monitor
 let zoomToggle = null;
 let toastTimer = null;
+let emulator = null;    // the frame while a real //e (apple2js/) has the screen
 let columns = MAX_LINE_LENGTH;
 
 // could also do this in CSS
@@ -398,7 +399,20 @@ function setUpPhone() {
     phoneScreen.addEventListener('click', () => phoneInput.focus());
 
     // The text field holds the line being typed; the screen mirrors it.
+    // While a real //e runs, each character is a key press on it instead,
+    // and the field keeps one space so that DELETE has something to delete.
     phoneInput.addEventListener('input', () => {
+	if (emulator) {
+	    const typed = phoneInput.value;
+	    if (typed.length < 1) {
+		forwardKey('keydown', { key: 'Backspace', keyCode: 8 });
+		forwardKey('keyup', { key: 'Backspace', keyCode: 8 });
+	    } else {
+		typeOnEmulator(typed.slice(1).replace(/[‘’]/g, "'").replace(/[“”]/g, '"'));
+	    }
+	    phoneInput.value = ' ';
+	    return;
+	}
 	if (!acceptingInput()) {
 	    phoneInput.value = ''; // the machine is off or busy
 	    return;
@@ -414,6 +428,12 @@ function setUpPhone() {
     // RETURN on any keyboard submits the form.
     phoneKeyboard.addEventListener('submit', (event) => {
 	event.preventDefault();
+	if (emulator) {
+	    forwardKey('keydown', { key: 'Enter', keyCode: 13 });
+	    forwardKey('keyup', { key: 'Enter', keyCode: 13 });
+	    phoneInput.value = ' ';
+	    return;
+	}
 	phoneInput.value = '';
 	if (acceptingInput()) {
 	    processCommand(lines[line]);
@@ -695,6 +715,13 @@ const commands = loadCommands(COMMAND_JSON);
 const files = diskFiles();
 
 
+document.addEventListener('keyup', (event) => {
+    // Let go of a key forwarded to the //e (see keydown).
+    if (emulator && event.target !== phoneInput && !event.metaKey && !event.altKey) {
+	forwardKey('keyup', event);
+    }
+});
+
 document.addEventListener('keydown', (event) => {
     if (event.isComposing || event.keyCode === 229) {
 	return;
@@ -709,6 +736,16 @@ document.addEventListener('keydown', (event) => {
 
     if (event.key === 'Escape' && zoomed) {
 	setZoomed(false);
+	return;
+    }
+
+    if (emulator) {
+	// The //e has the screen; a key pressed out here (after clicking
+	// the zoom toggle, say) still goes to it.
+	if (event.target !== phoneInput) {
+	    event.preventDefault();
+	    forwardKey('keydown', event);
+	}
 	return;
     }
 
@@ -888,6 +925,101 @@ function startProgram(name, args) {
     runProgramStep(() => program.start());
 }
 
+
+function bootDisk(disk) {
+    /* Hand the screen to a real Apple //e: apple2js (MIT, apple2js/) in a
+     * frame, booting `disk` in drive 1 and showing it in green. The menu's
+     * DOS is gone until the power switch brings it back. A disk that isn't
+     * there is an I/O ERROR. */
+    endProgram();
+    const token = programToken;
+    const url = new URL(disk, location.href).href;
+    working = true;
+    readFromFloppy(60);
+    fetch(url, { method: 'HEAD' }).then((response) => {
+	if (!response.ok) {
+	    throw new Error(disk + ': ' + response.status);
+	}
+	if (token !== programToken || !on) {
+	    return; // switched off while the drive spun up
+	}
+	emulator = document.createElement('iframe');
+	emulator.className = 'monitor__emulator';
+	emulator.title = 'Apple //e';
+	emulator.src = 'apple2js/apple2jse.html?mono_screen=true&gl_canvas=false#' + url;
+	if (!touchMode) {
+	    // On a phone the keys come from the phone keyboard instead.
+	    emulator.addEventListener('load', () => emulator && emulator.focus());
+	}
+	terminal.after(emulator);
+	document.body.classList.add('emulating');
+	if (touchMode) {
+	    phoneInput.value = ' ';
+	}
+    }).catch((error) => {
+	console.log(error);
+	if (token === programToken) {
+	    showError('I/O ERROR');
+	}
+    }).finally(() => {
+	if (token === programToken) {
+	    working = false;
+	    stopFloppy();
+	}
+    });
+}
+
+function stopEmulator() {
+    if (emulator) {
+	emulator.remove();
+	emulator = null;
+	document.body.classList.remove('emulating');
+	if (phoneInput) {
+	    phoneInput.value = '';
+	}
+    }
+}
+
+function forwardKey(type, { key, keyCode, shiftKey = false, ctrlKey = false }) {
+    /* Press a key on the //e. apple2js reads keyCode, which a made-up
+     * event can't be given directly, so it is added as a property. */
+    const frame = emulator.contentWindow;
+    if (!frame || !frame.KeyboardEvent) {
+	return; // still loading
+    }
+    const forwarded = new frame.KeyboardEvent(type, { key, shiftKey, ctrlKey, bubbles: true, cancelable: true });
+    Object.defineProperty(forwarded, 'keyCode', { get: () => keyCode });
+    frame.dispatchEvent(forwarded);
+}
+
+// US keyboard key codes for the punctuation a phone keyboard can type:
+// [keyCode, shifted].
+const PUNCTUATION_KEYS = {
+    ')': [48, true], '!': [49, true], '@': [50, true], '#': [51, true], '$': [52, true],
+    '%': [53, true], '^': [54, true], '&': [55, true], '*': [56, true], '(': [57, true],
+    ';': [186, false], ':': [186, true], '=': [187, false], '+': [187, true],
+    ',': [188, false], '<': [188, true], '-': [189, false], '_': [189, true],
+    '.': [190, false], '>': [190, true], '/': [191, false], '?': [191, true],
+    '`': [192, false], '~': [192, true], '[': [219, false], '{': [219, true],
+    '\\': [220, false], '|': [220, true], ']': [221, false], '}': [221, true],
+    "'": [222, false], '"': [222, true],
+};
+
+function typeOnEmulator(text) {
+    // Characters from the phone keyboard, as key presses on the //e.
+    for (const key of text) {
+	let keyCode = key.toUpperCase().charCodeAt(0);
+	let shiftKey = key >= 'A' && key <= 'Z';
+	if (key in PUNCTUATION_KEYS) {
+	    [keyCode, shiftKey] = PUNCTUATION_KEYS[key];
+	} else if (!/[A-Za-z0-9 ]/.test(key)) {
+	    continue;
+	}
+	forwardKey('keydown', { key, keyCode, shiftKey });
+	forwardKey('keyup', { key, keyCode, shiftKey });
+    }
+}
+
 function processCommand(command) {
 
     command = command.substring(promptText.length);
@@ -901,7 +1033,7 @@ function processCommand(command) {
     const resolved = resolveCommand(command);
     const action = resolved ? commands[resolved]["action"] : null;
 
-    if (["print", "redirect", "catalog", "program"].includes(action)) {
+    if (["print", "redirect", "catalog", "program", "boot"].includes(action)) {
 	syntaxErrorCounter = 0;
 	if (action == "print") {
 	    showArrayData(commands[resolved]["payload"]);
@@ -913,6 +1045,9 @@ function processCommand(command) {
 	    const [name, ...args] = commands[resolved]["payload"];
 	    startProgram(name, args);
 	}
+	if (action == "boot") {
+	    bootDisk(commands[resolved]["payload"][0]);
+	}
 	if (action == "redirect") {
 	    showArrayData([' ', 'CONFIRMED', ' ', 'You will be redirected in ' + REDIRECT_SECONDS.toString() + ' seconds.',
 			   ' ', 'You may use the BACK ARROW to return.', ' ']);
@@ -922,8 +1057,6 @@ function processCommand(command) {
 		pushRedirect(commands[resolved]["payload"][0]);
 	    }, (1000 * REDIRECT_SECONDS));
 	}
-	// Would be interesting to allow for emulating basic in javacsript, though supporting POKE and graphics ...
-	// Would be cool to make BRUN operate inside the screen as an iframe or something
 
     } else if (command == '') {
 	lines[++line] = ' ';
@@ -1033,6 +1166,7 @@ function stopMachine() {
     clearTimeout(redirectTimer);
     redirectTimer = null;
     clearTimeout(flickerTimer); // or it would cut short the power-off fade
+    stopEmulator();
     stopFloppy();
 }
 

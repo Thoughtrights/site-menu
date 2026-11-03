@@ -208,14 +208,36 @@ Deploying the proxy (a server step, not done):
   menu for that reason). If the EC2 address gets blocked, Floodgap asks for
   an email to gopher@floodgap.com explaining the proxy.
 
-### Emulator (TODO)
+### Emulator (started)
 
-- [ ] A real Apple IIe emulator in the monitor, as `BRUN EMULATOR` or a boot
-      option. apple2js (Apple ][ and //e in the browser, listed as MIT)
-      would run entirely in the visitor's browser: no server, no fees.
-- [ ] Apple's ROMs are Apple's copyright; decide whether to ship them.
-- [ ] Only disk images that may be shared: public domain, homebrew, or
-      released by their authors.
+- [x] A real Apple //e in the monitor: apple2js (MIT, Will Scullin) in a
+      frame over the screen, `html/menu/apple2js/`. A catalog entry with
+      `"action": "boot"` boots its disk in drive 1; the power switch brings
+      the menu's DOS back. Green via `?mono_screen=true`, 2D canvas so the
+      black lets the tube's glass show through.
+- [x] Disks (`html/menu/assets/disks/`): `RUN EAMON` (the Eamon master with
+      the Main Hall and the Beginners Cave, public domain; the disk itself
+      says "Non-commercial distribution welcomed"), `BRUN PRODOS` and `PR#6`
+      (ProDOS 8 2.4.3 with Bitsy Bye, free from prodos8.com but no stated
+      licence).
+- [x] Keys typed while the frame has lost focus, and the phone keyboard,
+      are forwarded to the //e as key events.
+- [ ] `BRUN CASTLE WOLFENSTEIN` is wired up but its disk isn't included:
+      put a `.dsk` at `assets/disks/castle-wolfenstein.dsk`. Its owner is
+      unknown, so no one can grant permission to host it. Until then it's
+      an I/O ERROR.
+- [ ] The ProDOS 2.4.3 disk also carries third-party utilities, including
+      Copy II Plus 8.4 (Central Point, commercial); consider a disk with
+      just ProDOS and BASIC.SYSTEM.
+- [ ] Apple's //e ROMs ship inside apple2js's chunks (`dist/524.bundle.js`,
+      `685.bundle.js`), as on every Apple II emulator site: tolerated by
+      Apple, never licensed.
+- [ ] More Eamon adventures on a second drive (`#master|adventure`), and
+      your own Eamon adventures once the floppies are imaged.
+- [ ] Mirror the //e's drive light on the menu's floppy drive
+      (apple2js exports `driveLights`). A Mockingboard isn't emulated.
+- [ ] The emulator only runs while its page is visible (it steps on
+      animation frames), which is fine for visitors.
 - [ ] Desktop emulators to compare against: MAME (`apple2e`) and microM8 on
       Ubuntu and macOS; MII and AppleWin's Linux port on Ubuntu; Virtual ][,
       Mariani and Clock Signal on macOS.
