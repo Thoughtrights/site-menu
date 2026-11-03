@@ -214,6 +214,44 @@
 	"action": "alias",
 	"payload": ["BRUN GOPHER"]
     },
+    "BRUN ZORK I" : {
+	"action": "program",
+	"type": "B",
+	"sectors": 340,
+	"payload": ["zork", "zork1"]
+    },
+    "RUN ZORK I" : {
+	"action": "alias",
+	"payload": ["BRUN ZORK I"]
+    },
+    "BRUN ZORK II" : {
+	"action": "program",
+	"type": "B",
+	"sectors": 362,
+	"payload": ["zork", "zork2"]
+    },
+    "RUN ZORK II" : {
+	"action": "alias",
+	"payload": ["BRUN ZORK II"]
+    },
+    "BRUN ZORK III" : {
+	"action": "program",
+	"type": "B",
+	"sectors": 344,
+	"payload": ["zork", "zork3"]
+    },
+    "RUN ZORK III" : {
+	"action": "alias",
+	"payload": ["BRUN ZORK III"]
+    },
+    "BRUN ZORK" : {
+	"action": "alias",
+	"payload": ["BRUN ZORK I"]
+    },
+    "RUN ZORK" : {
+	"action": "alias",
+	"payload": ["BRUN ZORK I"]
+    },
     "HELP": {
 	"action": "print",
 	"payload": [" \n",

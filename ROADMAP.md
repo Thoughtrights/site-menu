@@ -178,6 +178,17 @@ Options, roughly from least to most work:
 - [x] Local: `python3 tools/dev-server.py`, then
       http://localhost:8765/menu/apple-IIe.html runs the CGI as Apache would.
 
+### ZORK (done)
+
+- [x] `BRUN ZORK I`, `ZORK II`, `ZORK III` (and `BRUN ZORK`): Infocom's
+      story files, which Microsoft, Xbox and Activision put under the MIT
+      licence on 2025-11-20 (`assets/zork/LICENSE`), played by JSZM, a
+      public-domain Z-machine (`js/jszm.js`, from DLehenbauer/jszm, zzo38's
+      v2.0.2). Runs in the menu itself: no Apple ROM, no DOS. These are
+      late development builds (Zork I is release 119), not the boxed ones.
+- [x] SAVE and RESTORE keep one game per story in the browser's storage.
+- [ ] The status line (room, score, moves) isn't shown.
+
 WAIS: no public WAIS servers are known to be running any more. Gopher's own
 search items (Veronica-2, Gopherpedia) are the period equivalent.
 

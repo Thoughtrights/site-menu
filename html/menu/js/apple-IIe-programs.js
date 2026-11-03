@@ -190,3 +190,71 @@ PROGRAMS.remote = (machine, url) => {
 	input: (text) => step(text),
     };
 };
+
+
+/* ZORK I, II, III: Infocom's story files, MIT licensed by Microsoft in
+ * 2025 (assets/zork/LICENSE), played by JSZM, a public-domain Z-machine
+ * (js/jszm.js). JSZM runs the game as a generator that stops at every
+ * READ; each line typed starts it again. What it printed up to the last
+ * newline goes on the screen and the rest (">") becomes the prompt.
+ * SAVE and RESTORE use this browser's storage, one game per story. */
+PROGRAMS.zork = (machine, story) => {
+    const saveKey = 'apple-IIe-zork-' + story;
+    let run = null;
+    let text = '';
+
+    function show() {
+	const cut = text.lastIndexOf('\n') + 1;
+	const printed = text.slice(0, cut);
+	const prompt = toAscii(text.slice(cut));
+	text = '';
+	machine.setPrompt(prompt || '>');
+	return machine.print(wordWrap(toAscii(printed), machine.columns()));
+    }
+
+    function resume(line) {
+	if (run.next(line).done) { // QUIT: the last words, then DOS's "]"
+	    machine.exit();
+	    const last = wordWrap(toAscii(text), machine.columns());
+	    text = '';
+	    return machine.print(last);
+	}
+	return show();
+    }
+
+    function load(buffer) {
+	const game = new JSZM(new Uint8Array(buffer));
+	game.print = function* (output) { text += output; };
+	game.read = function* () { return yield 'read'; };
+	game.save = function* (data) {
+	    try {
+		let bytes = '';
+		data.forEach((byte) => { bytes += String.fromCharCode(byte); });
+		localStorage.setItem(saveKey, btoa(bytes));
+		return true;
+	    } catch (error) {
+		return false;
+	    }
+	};
+	game.restore = function* () {
+	    try {
+		const saved = localStorage.getItem(saveKey);
+		return saved ? Uint8Array.from(atob(saved), (c) => c.charCodeAt(0)) : null;
+	    } catch (error) {
+		return null;
+	    }
+	};
+	run = game.run();
+	return resume();
+    }
+
+    return {
+	start: () => machine.work(fetch('assets/zork/' + story + '.z3').then((response) => {
+	    if (!response.ok) {
+		throw new Error('story file: ' + response.status);
+	    }
+	    return response.arrayBuffer();
+	})).then(load),
+	input: (line) => resume(line),
+    };
+};
