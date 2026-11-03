@@ -28,7 +28,14 @@ const POWER_BUTTON_ALERT_SECONDS_STOP = 120; // just stop any alert if they have
 const DOS_FILE_VERBS = ['RUN', 'BRUN', 'OPEN', 'LOAD', 'BLOAD', 'EXEC', 'READ'];
 const DESK_PARTS = '.monitor, .keyboard, .keyboard *, .floppy-drive, .floppy-drive *';
 const ZOOM_SECONDS = 1.4;
-const FLICKER_WARM_UP_SECONDS = 60; // then the screen only flickers once a minute
+const FLICKER_WARM_UP_SECONDS = 60; // then the screen only flickers now and then:
+const FLICKER_EVERY_SECONDS = 60;    // a flicker every 60 seconds...
+const FLICKER_JITTER_SECONDS = 20;   // ...plus up to 20 more, so it never keeps time
+const FLICKERS = [                   // one of these, at random (apple-IIe.css)
+    'flicker-burst 0.6s steps(1, end)',
+    'flicker-burst-fast 0.25s steps(1, end)',
+    'flicker-burst-faint 0.6s steps(1, end)',
+];
 const TOAST_SECONDS = 2.5;
 const PHONE_LINE_HEIGHT = 1.2;
 const PHONE_80_COLUMN_WIDTH = 640; // narrower screens get the 40 column display
@@ -932,12 +939,22 @@ function processCommand(command) {
     }
 }
 function animateTerminalFlicker() {
-    /* Flicker hard while the set warms up, then only once a minute. */
+    /* Flicker hard while the set warms up, then only now and then. */
     terminal.style.animation = 'flicker-2 0.005s infinite';
     clearTimeout(flickerTimer);
     flickerTimer = setTimeout(() => {
-	terminal.style.animation = 'flicker-once-a-minute 60s infinite';
+	terminal.style.animation = 'none';
+	scheduleFlicker();
     }, FLICKER_WARM_UP_SECONDS * 1000);
+}
+function scheduleFlicker() {
+    const seconds = FLICKER_EVERY_SECONDS + Math.random() * FLICKER_JITTER_SECONDS;
+    flickerTimer = setTimeout(() => {
+	terminal.style.animation = 'none';
+	void terminal.offsetWidth; // so the same flicker twice in a row still plays
+	terminal.style.animation = FLICKERS[Math.floor(Math.random() * FLICKERS.length)];
+	scheduleFlicker();
+    }, seconds * 1000);
 }
 function animateTerminalPowerOn(warmUp) {
     terminal.style.animation = 'turn-on ' + warmUp.toString() + 's linear';

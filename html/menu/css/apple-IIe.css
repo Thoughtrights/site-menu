@@ -114,29 +114,50 @@ body {
   opacity: 0.44387;
   }
 }
-/* Once the set has warmed up: steady, with a 0.6s flicker at the end of
- * each minute. Run as `flicker-once-a-minute 60s infinite`. */
-@keyframes flicker-once-a-minute {
-  0%, 98.9% { opacity: 1; animation-timing-function: steps(1, end); }
-  98.95% { opacity: 0.47861; animation-timing-function: steps(1, end); }
-  99% { opacity: 0.54769; animation-timing-function: steps(1, end); }
-  99.05% { opacity: 0.43604; animation-timing-function: steps(1, end); }
-  99.1% { opacity: 1; animation-timing-function: steps(1, end); }
-  99.15% { opacity: 0.38128; animation-timing-function: steps(1, end); }
-  99.2% { opacity: 1; animation-timing-function: steps(1, end); }
-  99.25% { opacity: 0.85583; animation-timing-function: steps(1, end); }
-  99.3% { opacity: 0.87807; animation-timing-function: steps(1, end); }
-  99.35% { opacity: 0.46559; animation-timing-function: steps(1, end); }
-  99.4% { opacity: 1; animation-timing-function: steps(1, end); }
-  99.5% { opacity: 0.28594; animation-timing-function: steps(1, end); }
-  99.55% { opacity: 0.40313; animation-timing-function: steps(1, end); }
-  99.6% { opacity: 0.91988; animation-timing-function: steps(1, end); }
-  99.65% { opacity: 0.73455; animation-timing-function: steps(1, end); }
-  99.7% { opacity: 0.57288; animation-timing-function: steps(1, end); }
-  99.75% { opacity: 0.91428; animation-timing-function: steps(1, end); }
-  99.8% { opacity: 0.90419; animation-timing-function: steps(1, end); }
-  99.9% { opacity: 0.56108; animation-timing-function: steps(1, end); }
-  99.95% { opacity: 0.44387; animation-timing-function: steps(1, end); }
+/* Once the set has warmed up, the screen is steady except for a short
+ * flicker every minute or so (see FLICKERS in apple-IIe.js), one of: */
+@keyframes flicker-burst {        /* the full flicker, about 0.6s */
+  0%   { opacity: 0.47861; }
+  5%   { opacity: 0.54769; }
+  10%  { opacity: 0.43604; }
+  15%  { opacity: 1; }
+  20%  { opacity: 0.38128; }
+  25%  { opacity: 1; }
+  30%  { opacity: 0.85583; }
+  35%  { opacity: 0.87807; }
+  40%  { opacity: 0.46559; }
+  45%  { opacity: 1; }
+  55%  { opacity: 0.28594; }
+  60%  { opacity: 0.40313; }
+  65%  { opacity: 0.91988; }
+  70%  { opacity: 0.73455; }
+  75%  { opacity: 0.57288; }
+  80%  { opacity: 0.91428; }
+  85%  { opacity: 0.90419; }
+  90%  { opacity: 0.56108; }
+  95%  { opacity: 0.44387; }
+  100% { opacity: 1; }
+}
+@keyframes flicker-burst-fast {   /* a quick stutter, about 0.25s */
+  0%   { opacity: 0.43604; }
+  15%  { opacity: 1; }
+  30%  { opacity: 0.38128; }
+  45%  { opacity: 0.91988; }
+  60%  { opacity: 0.28594; }
+  75%  { opacity: 0.87807; }
+  90%  { opacity: 0.54769; }
+  100% { opacity: 1; }
+}
+@keyframes flicker-burst-faint {  /* barely there, about 0.6s */
+  0%   { opacity: 0.96; }
+  10%  { opacity: 0.92; }
+  20%  { opacity: 1; }
+  30%  { opacity: 0.94; }
+  45%  { opacity: 0.97; }
+  55%  { opacity: 0.9; }
+  65%  { opacity: 1; }
+  75%  { opacity: 0.95; }
+  90%  { opacity: 0.98; }
   100% { opacity: 1; }
 }
 
