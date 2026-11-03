@@ -957,8 +957,8 @@ body.screen-on .phone-screen {
   caret-color: transparent;
 }
 
-/* Desktop zoom: a bit of the monitor's plastic in the corner, dim until
- * the mouse comes near it. */
+/* Desktop zoom: a bit of the monitor's plastic in the corner, a little
+ * muted until the mouse comes near it. */
 .zoom-toggle {
   position: fixed;
   right: 16px;
@@ -967,13 +967,13 @@ body.screen-on .phone-screen {
   width: 32px;
   height: 32px;
   padding: 6px;
-  border: 0;
+  border: 1px solid #9c978a;
   border-top: 2px solid #f4f1e8;
   border-radius: 4px;
   background: linear-gradient(145deg, #e7e4d9, #c9c5b8);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
   cursor: pointer;
-  opacity: 0.35;
+  opacity: 0.8;
   transition: opacity 0.3s ease;
 }
 .zoom-toggle:hover,
@@ -989,15 +989,15 @@ body.screen-on .phone-screen {
   width: 100%;
   height: 100%;
   fill: none;
-  stroke: #6b675c;
-  stroke-width: 2;
+  stroke: #4a463d;
+  stroke-width: 2.25;
   stroke-linecap: square;
 }
-.zoom-toggle__out,
-body.zoomed .zoom-toggle__in {
+.zoom-toggle .zoom-toggle__out,
+body.zoomed .zoom-toggle .zoom-toggle__in {
   display: none;
 }
-body.zoomed .zoom-toggle__out {
+body.zoomed .zoom-toggle .zoom-toggle__out {
   display: block;
 }
 @media (hover: none) and (pointer: coarse) {
