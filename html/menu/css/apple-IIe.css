@@ -1053,7 +1053,8 @@ body.zoomed .zoom-toggle .zoom-toggle__out {
 }
 
 /* A real //e (apple2js/) booted from a disk: its screen replaces the
- * menu's text. Black pixels let the tube's own glass show through. */
+ * menu's text, in the same green. Its black is transparent, so the tube's
+ * own glass shows through (the filter is in apple2js/apple2jse.html). */
 body.emulating .monitor__terminal {
   display: none;
 }
@@ -1065,7 +1066,6 @@ body.emulating .monitor__terminal {
   height: calc(100% - 4vmin);
   border: 0;
   background: transparent;
-  mix-blend-mode: screen;
 }
 .phone-screen .monitor__emulator {
   position: relative;

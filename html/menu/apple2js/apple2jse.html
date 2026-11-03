@@ -37,10 +37,10 @@
      (js/apple-IIe.js, bootDisk). Only the screen shows; the disk to boot
      comes in the URL's #, and ?mono_screen=true makes it green. -->
 <style>
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
   .outer { position: fixed; inset: 0; margin: 0; padding: 0; width: auto; }
   #header, .inset, #reset-row, #keyboard, #exit-fullscreen { display: none !important; }
-  #display, .apple2e #display, .overscan { position: absolute; inset: 0; margin: 0; padding: 0; width: auto; height: auto; border: 0; border-radius: 0; background: #000; box-shadow: none; }
+  #display, .apple2e #display, .overscan { position: absolute; inset: 0; margin: 0; padding: 0; width: auto; height: auto; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
   #screen { width: 100% !important; height: 100% !important; cursor: default; }
 </style>
 <script>
@@ -341,13 +341,16 @@
   </div>
 
   <svg width="0" height="0" xmlns="http://www.w3.org/2000/svg">
-    <filter id="green">
+    <!-- Site menu: every lit pixel is the menu's text colour, #33ff33 (0.2, 1,
+         0.2), as bright as the pixel was. Black is transparent, so the
+         tube's glass shows through the frame. -->
+    <filter id="green" color-interpolation-filters="sRGB">
       <feColorMatrix
         type="matrix"
-        values="0.0 0.0 0.0 0.0 0
-                0.0 1.0 0.0 0.0 0
-                0.0 0.0 0.5 0.0 0
-                0.0 0.0 0.0 1.0 0"
+        values="0.0 0.0 0.0 0.0 0.2
+                0.0 0.0 0.0 0.0 1.0
+                0.0 0.0 0.0 0.0 0.2
+                0.2126 0.7152 0.0722 0.0 0"
       />
       </filter>
   </svg>
