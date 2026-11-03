@@ -193,9 +193,18 @@ There's nothing to build after editing it; just deploy the file again.
   for.
   The two `reserved` entries hold the boot text and can't be typed.
 - **Remote programs:** a `program` entry with payload
-  `["remote", "<url>"]` runs a remote program. The page POSTs each line to
-  that URL. ROADMAP.md, under "Programs on the disk", describes the JSON it
-  sends and expects back, for anyone writing another one.
+  `["remote", "<url>"]` runs a program on a server. The page sends one
+  JSON POST per line typed, and the server keeps no session:
+
+  ```
+  request:  { "input": null | "typed line", "state": <last reply's state>,
+              "columns": 40 | 80, "rows": 23 }
+  reply:    { "print": ["lines", ...], "prompt": "SEARCH? ",
+              "state": { ... }, "exit": false }
+  ```
+
+  If the server isn't the same origin as the page, it must also send CORS
+  headers allowing the page's origin and answer the `OPTIONS` preflight.
 
 ### Real //e disks
 
@@ -216,3 +225,20 @@ which isn't in the repository; until it's there, the command prints
 	"payload": ["assets/disks/my-game.dsk"]
 }
 ```
+
+### Getting disks
+
+Only add disks you may share: your own work, public-domain software, or
+programs whose owners have released them. To turn your own floppies into disk
+images:
+
+- **With a working Apple II:** ADTPro sends disks to a modern computer over a
+  serial cable, an audio cable or Ethernet. It only copies disks without copy
+  protection.
+- **With a PC 5.25" drive:** Greaseweazle or FluxEngine, open hardware that
+  records the raw signal. FluxEngine reads ordinary DOS 3.3 and ProDOS disks
+  only.
+- **For copy-protected disks:** Applesauce, which makes `.woz` images.
+
+Image each disk once and keep the file; old disks only get worse. Don't run a
+disk with visible mould through a drive.
