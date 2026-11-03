@@ -37,6 +37,8 @@ const PHONE_80_COLUMN_WIDTH = 640; // narrower screens get the 40 column display
 // screen, which then fills the window above the phone's own keyboard.
 const touchMode = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 let screenMode = false;
+let zoomed = false;     // desktop: leaning in to the monitor
+let zoomToggle = null;
 let columns = MAX_LINE_LENGTH;
 
 // could also do this in CSS
@@ -188,6 +190,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (touchMode) {
 	setUpPhone();
+    } else {
+	zoomToggle = document.querySelector('.zoom-toggle');
+	zoomToggle.addEventListener('click', () => {
+	    setZoomed(!zoomed);
+	    zoomToggle.blur(); // so the space bar and RETURN keep typing
+	});
+	document.querySelector('.monitor').addEventListener('dblclick', (event) => {
+	    if (event.target.closest('.monitor__power-switch')) {
+		return;
+	    }
+	    window.getSelection().removeAllRanges(); // a double-click selects a word
+	    setZoomed(!zoomed);
+	});
     }
 
   for (let i = 0; i < keys.length; i++) {
@@ -223,6 +238,8 @@ window.addEventListener('resize', () => {
     if (screenMode) {
 	zoomToScreen(0);
 	layoutPhoneScreen();
+    } else if (zoomed) {
+	zoomToMonitor(0);
     } else {
 	fitScene();
     }
@@ -315,6 +332,23 @@ function fitScene(seconds = 0) {
 
 function zoomToScreen(seconds) {
     setSceneToFit('.monitor__screen', Infinity, 0, seconds);
+}
+
+function zoomToMonitor(seconds) {
+    /* Desktop: the screen and its bezel fill the window. */
+    setSceneToFit('.monitor__inner', Infinity, 0.04, seconds);
+}
+
+function setZoomed(zoom) {
+    zoomed = zoom;
+    document.body.classList.toggle('zoomed', zoomed);
+    zoomToggle.setAttribute('aria-pressed', String(zoomed));
+    zoomToggle.setAttribute('aria-label', zoomed ? 'Back out to the desk' : 'Zoom in on the screen');
+    if (zoomed) {
+	zoomToMonitor(ZOOM_SECONDS);
+    } else {
+	fitScene(ZOOM_SECONDS);
+    }
 }
 
 
@@ -644,6 +678,11 @@ document.addEventListener('keydown', (event) => {
     const keycode = event.keyCode;
 
     animateKey(keycode);
+
+    if (event.key === 'Escape' && zoomed) {
+	setZoomed(false);
+	return;
+    }
 
     if (event.ctrlKey) {
 	if (keycode === KEY_C || event.key.toLowerCase() === 'c') {

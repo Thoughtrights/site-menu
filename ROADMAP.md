@@ -75,6 +75,10 @@ Still open:
       without a keyboard attached.
 - [ ] The text is small on a phone held upright (about 10px): 40 columns at
       that width is the limit.
+- [x] Desktop zoom: a small beige toggle in the bottom-right corner (dim
+      until pointed at) leans in until the screen and bezel fill the
+      window, and back out to the desk. Double-clicking the monitor and
+      Esc do the same.
 
 ## 3. Keyboard that looks like a IIe
 
