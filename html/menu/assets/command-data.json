@@ -4,20 +4,8 @@
 	"payload": ["                                      Apple //e\n"]
     },
     "CATALOG" : {
-	"action": "print",
-	"payload": [" \n",
-		    "DISK VOLUME 254\n",
-		    " \n",
-		    " T 019 RESUME\n",
-		    " B 030 BARZY\n",
-		    " T 008 JOBPOST\n",
-		    " B 008 DAEMOUS\n",
-		    " I 040 SPOKENWORD\n",
-		    " A 002 FOODNET\n",
-		    " A 002 DUNGEONEER\n",
-		    " B 007 ALPHACOMPLEX\n",
-		    " T 001 INDIGOBRIEF\n",
-		    " \n"]
+	"action": "catalog",
+	"volume": 254
     },
     "CAT" : {
 	"action": "alias",
@@ -33,64 +21,26 @@
 		    " ___) | | |  |  _ <| |  __/ |\n",
 		    "|____/|_|_|  |_| `_`_|`___|_|\n\n\n"]
     },
+    "OPEN RESUME" : {
+	"action": "redirect",
+	"type": "T",
+	"sectors": 19,
+	"payload": ["https://www.thoughtrights.com/resume/"]
+    },
     "BRUN BARZY" : {
 	"action": "redirect",
+	"type": "B",
+	"sectors": 30,
 	"payload": ["https://www.thoughtrights.com/barzy/"]
     },
     "RUN BARZY" : {
 	"action": "alias",
 	"payload": ["BRUN BARZY"]
     },
-    "BRUN ALPHACOMPLEX" : {
-	"action": "redirect",
-	"payload": ["https://www.bin.sh/gaming/alpha/alpha.cgi"]
-    },
-    "RUN ALPHACOMPLEX" : {
-	"action": "alias",
-	"payload": ["BRUN ALPHACOMPLEX"]
-    },
-    "BRUN DAEMOUS" : {
-	"action": "redirect",
-	"payload": ["https://www.thoughtrights.com/daemous/"]
-    },
-    "RUN DAEMOUS" : {
-	"action": "alias",
-	"payload": ["BRUN DAEMOUS"]
-    },
-    "OPEN RESUME" : {
-	"action": "redirect",
-	"payload": ["https://www.thoughtrights.com/resume/"]
-    },
-    "RUN DUNGEONEER" : {
-	"action": "redirect",
-	"payload": ["https://www.dungeoneer.com/"]
-    },
-    "RUN FOODNET" : {
-	"action": "redirect",
-	"payload": ["https://www.food.net/"]
-    },
-    "RUN SPOKENWORD" : {
-	"action": "redirect",
-	"payload": ["https://www.thoughtrights.com/spoken-word/"]
-    },
-    "OPEN INDIGOBRIEF": {
-	"action": "print",
-	"junk":	"1234567890123456789012345678901234567890123456789012345678901234567890123456789\n",
-	"payload": ["ATTENTION TROUBLESHOOTER. THIS IS AN INDIGO BRIEFING.\n",
-		    " \n",
-		    "ALPHA COMPLEX was implemented by drow@bin.sh, aka Doug Rau.\n",
-		    "Alpha Complex is a solo Paranoia game written by Sam Shirley, taken from the\n",
-		    "Jan/Feb issue (No. 77) of Space Gamer/Fantasy Gamer magazine. This is a public\n",
-		    "domain adventure and may not be sold or otherwise used for profit.",
-		    "Paranoia images are Copyright (c) West End Games and used without permission.\n",
-		    " \n",
-		    "THE COMPUTER IS YOUR FRIEND.\n",
-		    " \n",
-		    "BRUN ALPHACOMPLEX\n",
-		    " \n"]
-    },
     "OPEN JOBPOST": {
 	"action": "print",
+	"type": "T",
+	"sectors": 8,
 	"junk":	"1234567890123456789012345678901234567890123456789012345678901234567890123456789\n",
 	"payload": [" \n",
 		    "From illuminati.io.com!uunet!in1.uu.net!bloom-beacon.mit.edu!hookup!\n",
@@ -188,6 +138,158 @@
 		    "(908) 735-4207 [fax]\n",
 		    " \n"]
     },
+    "BRUN DAEMOUS" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 8,
+	"payload": ["https://www.thoughtrights.com/daemous/"]
+    },
+    "RUN DAEMOUS" : {
+	"action": "alias",
+	"payload": ["BRUN DAEMOUS"]
+    },
+    "RUN SPOKENWORD" : {
+	"action": "redirect",
+	"type": "I",
+	"sectors": 40,
+	"payload": ["https://www.thoughtrights.com/spoken-word/"]
+    },
+    "RUN FOODNET" : {
+	"action": "redirect",
+	"type": "A",
+	"sectors": 2,
+	"payload": ["https://www.food.net/"]
+    },
+    "RUN DUNGEONEER" : {
+	"action": "redirect",
+	"type": "A",
+	"sectors": 2,
+	"payload": ["https://www.dungeoneer.com/"]
+    },
+    "BRUN ALPHACOMPLEX" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 7,
+	"payload": ["https://www.bin.sh/gaming/alpha/alpha.cgi"]
+    },
+    "RUN ALPHACOMPLEX" : {
+	"action": "alias",
+	"payload": ["BRUN ALPHACOMPLEX"]
+    },
+    "OPEN INDIGOBRIEF": {
+	"action": "print",
+	"type": "T",
+	"sectors": 1,
+	"junk":	"1234567890123456789012345678901234567890123456789012345678901234567890123456789\n",
+	"payload": ["ATTENTION TROUBLESHOOTER. THIS IS AN INDIGO BRIEFING.\n",
+		    " \n",
+		    "ALPHA COMPLEX was implemented by drow@bin.sh, aka Doug Rau.\n",
+		    "Alpha Complex is a solo Paranoia game written by Sam Shirley, taken from the\n",
+		    "Jan/Feb issue (No. 77) of Space Gamer/Fantasy Gamer magazine. This is a public\n",
+		    "domain adventure and may not be sold or otherwise used for profit.",
+		    "Paranoia images are Copyright (c) West End Games and used without permission.\n",
+		    " \n",
+		    "THE COMPUTER IS YOUR FRIEND.\n",
+		    " \n",
+		    "BRUN ALPHACOMPLEX\n",
+		    " \n"]
+    },
+    "BRUN SEARCH" : {
+	"action": "program",
+	"type": "B",
+	"sectors": 34,
+	"payload": ["search"]
+    },
+    "RUN SEARCH" : {
+	"action": "alias",
+	"payload": ["BRUN SEARCH"]
+    },
+    "BRUN GOPHER" : {
+	"action": "program",
+	"type": "B",
+	"sectors": 41,
+	"payload": ["remote", "proxy/gopher.cgi"]
+    },
+    "RUN GOPHER" : {
+	"action": "alias",
+	"payload": ["BRUN GOPHER"]
+    },
+    "BRUN ZORK I" : {
+	"action": "program",
+	"type": "B",
+	"sectors": 340,
+	"payload": ["zork", "zork1"]
+    },
+    "RUN ZORK I" : {
+	"action": "alias",
+	"payload": ["BRUN ZORK I"]
+    },
+    "BRUN ZORK II" : {
+	"action": "program",
+	"type": "B",
+	"sectors": 362,
+	"payload": ["zork", "zork2"]
+    },
+    "RUN ZORK II" : {
+	"action": "alias",
+	"payload": ["BRUN ZORK II"]
+    },
+    "BRUN ZORK III" : {
+	"action": "program",
+	"type": "B",
+	"sectors": 344,
+	"payload": ["zork", "zork3"]
+    },
+    "RUN ZORK III" : {
+	"action": "alias",
+	"payload": ["BRUN ZORK III"]
+    },
+    "BRUN ZORK" : {
+	"action": "alias",
+	"payload": ["BRUN ZORK I"]
+    },
+    "RUN ZORK" : {
+	"action": "alias",
+	"payload": ["BRUN ZORK I"]
+    },
+    "RUN EAMON" : {
+	"action": "boot",
+	"type": "A",
+	"sectors": 48,
+	"payload": ["assets/disks/eamon-001-main-hall.dsk"]
+    },
+    "BRUN EAMON" : {
+	"action": "alias",
+	"payload": ["RUN EAMON"]
+    },
+    "BRUN PRODOS" : {
+	"action": "boot",
+	"type": "B",
+	"sectors": 280,
+	"payload": ["assets/disks/prodos-2.4.3.po"]
+    },
+    "RUN PRODOS" : {
+	"action": "alias",
+	"payload": ["BRUN PRODOS"]
+    },
+    "PR#6" : {
+	"action": "alias",
+	"payload": ["BRUN PRODOS"]
+    },
+    "BRUN CASTLE WOLFENSTEIN" : {
+	"action": "boot",
+	"type": "B",
+	"sectors": 120,
+	"payload": ["assets/disks/castle-wolfenstein.dsk"]
+    },
+    "RUN CASTLE WOLFENSTEIN" : {
+	"action": "alias",
+	"payload": ["BRUN CASTLE WOLFENSTEIN"]
+    },
+    "BRUN WOLFENSTEIN" : {
+	"action": "alias",
+	"payload": ["BRUN CASTLE WOLFENSTEIN"]
+    },
     "HELP": {
 	"action": "print",
 	"payload": [" \n",
@@ -209,5 +311,3 @@
 	"payload": ["HELP"]
     }
 }
- 
-

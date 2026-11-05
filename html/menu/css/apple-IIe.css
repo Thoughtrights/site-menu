@@ -30,8 +30,13 @@
   font-family: "Terminal";
   src: url("../assets/apple-IIe-80col.ttf");
 }
+@font-face {
+  font-family: "Terminal40";
+  src: url("../assets/apple-IIe-40col.ttf");
+}
 html {
   width: 100%;
+  overflow: hidden; /* the scene is scaled to fit; never scroll */
 }
 
 body {
@@ -39,6 +44,7 @@ body {
   padding: 0;
   width: 100%;
   height: 100vh;
+  overflow: hidden;
   display: grid;
   place-items: center;
 }
@@ -108,6 +114,53 @@ body {
   opacity: 0.44387;
   }
 }
+/* Once the set has warmed up, the screen is steady except for a short
+ * flicker every minute or so (see FLICKERS in apple-IIe.js), one of: */
+@keyframes flicker-burst {        /* the full flicker, about 0.6s */
+  0%   { opacity: 0.47861; }
+  5%   { opacity: 0.54769; }
+  10%  { opacity: 0.43604; }
+  15%  { opacity: 1; }
+  20%  { opacity: 0.38128; }
+  25%  { opacity: 1; }
+  30%  { opacity: 0.85583; }
+  35%  { opacity: 0.87807; }
+  40%  { opacity: 0.46559; }
+  45%  { opacity: 1; }
+  55%  { opacity: 0.28594; }
+  60%  { opacity: 0.40313; }
+  65%  { opacity: 0.91988; }
+  70%  { opacity: 0.73455; }
+  75%  { opacity: 0.57288; }
+  80%  { opacity: 0.91428; }
+  85%  { opacity: 0.90419; }
+  90%  { opacity: 0.56108; }
+  95%  { opacity: 0.44387; }
+  100% { opacity: 1; }
+}
+@keyframes flicker-burst-fast {   /* a quick stutter, about 0.25s */
+  0%   { opacity: 0.43604; }
+  15%  { opacity: 1; }
+  30%  { opacity: 0.38128; }
+  45%  { opacity: 0.91988; }
+  60%  { opacity: 0.28594; }
+  75%  { opacity: 0.87807; }
+  90%  { opacity: 0.54769; }
+  100% { opacity: 1; }
+}
+@keyframes flicker-burst-faint {  /* barely there, about 0.6s */
+  0%   { opacity: 0.96; }
+  10%  { opacity: 0.92; }
+  20%  { opacity: 1; }
+  30%  { opacity: 0.94; }
+  45%  { opacity: 0.97; }
+  55%  { opacity: 0.9; }
+  65%  { opacity: 1; }
+  75%  { opacity: 0.95; }
+  90%  { opacity: 0.98; }
+  100% { opacity: 1; }
+}
+
 @keyframes turn-on {
   0% {
     transform: scale(1, 0.8) translate3d(0, 0, 0);
@@ -173,7 +226,11 @@ body {
 
 
 .🖥️ {
-  position: absolute;
+  /* fixed, so the parts sticking out don't widen the page;
+     fitScene() in the JS scales and centers it */
+  position: fixed;
+  left: 0;
+  top: 0;
   width: 100vmin;
   height: 100vmin;
   perspective: 80vmin;
@@ -671,6 +728,7 @@ body {
   font-size: 1vmin;
   color: #33ff33;
   font-family: "Terminal";
+  white-space: pre; /* keep runs of spaces; long lines are wrapped in JS */
   /* text-transform: uppercase; */
   /* We're using an 80 column card, so we can have lowercase. ;-) */
   /*  animation: flicker 0.15s infinite; */
@@ -854,4 +912,166 @@ body {
   width: 1vmin;
   height: 1vmin;
   background-image: url("../assets/apple-filled.svg");
+}
+
+/* Phones and tablets: after the zoom, the screen fills what is visible
+   above the phone keyboard. The JS moves the terminal in here and sets
+   the size variables. */
+.phone-screen {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 45%, #50684c 0%, #3e553b 55%, #1f2c1e 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease-in;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.phone-screen::after {
+  /* scan lines */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.14) 0, rgba(0, 0, 0, 0.14) 1px, transparent 1px, transparent 3px);
+}
+body.screen-on .phone-screen {
+  opacity: 1;
+  pointer-events: auto;
+}
+.phone-screen .monitor__terminal {
+  flex: none;
+  width: var(--terminal-width);
+  height: var(--terminal-height);
+  padding: 0;
+  font-family: var(--terminal-font);
+  font-size: var(--terminal-font-size);
+  line-height: var(--terminal-line-height);
+  text-shadow: 0 0 0.35em rgba(51, 255, 51, 0.55);
+}
+.phone-screen .monitor__terminal .cursor {
+  width: 0.8em;
+  height: 0.8em;
+  margin: 0.1em;
+}
+.phone-keyboard {
+  /* invisible, but focusable so the phone keyboard comes up */
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+.phone-keyboard input {
+  font-size: 16px; /* smaller makes iOS zoom the page on focus */
+  caret-color: transparent;
+}
+
+/* Desktop zoom: a bit of the monitor's plastic in the corner, a little
+ * muted until the mouse comes near it. */
+.zoom-toggle {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 900;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  border: 1px solid #9c978a;
+  border-top: 2px solid #f4f1e8;
+  border-radius: 4px;
+  background: linear-gradient(145deg, #e7e4d9, #c9c5b8);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+.zoom-toggle:hover,
+.zoom-toggle:focus-visible {
+  opacity: 1;
+}
+.zoom-toggle:focus-visible {
+  outline: 2px solid #33ff33;
+  outline-offset: 2px;
+}
+.zoom-toggle svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: #4a463d;
+  stroke-width: 2.25;
+  stroke-linecap: square;
+}
+.zoom-toggle .zoom-toggle__out,
+body.zoomed .zoom-toggle .zoom-toggle__in {
+  display: none;
+}
+body.zoomed .zoom-toggle .zoom-toggle__out {
+  display: block;
+}
+@media (hover: none) and (pointer: coarse) {
+  .zoom-toggle {
+    display: none; /* phones zoom in on their own */
+  }
+}
+
+/* A brief note, in the same plastic as the zoom toggle. */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 950;
+  padding: 10px 16px;
+  border: 1px solid #9c978a;
+  border-top: 2px solid #f4f1e8;
+  border-radius: 4px;
+  background: linear-gradient(145deg, #e7e4d9, #c9c5b8);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  color: #3a372f;
+  font: 15px/1.3 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.toast--shown {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* A real //e (apple2js/) booted from a disk: its screen replaces the
+ * menu's text, in the same green. Its black is transparent, so the tube's
+ * own glass shows through (the filter is in apple2js/apple2jse.html). */
+body.emulating .monitor__terminal {
+  display: none;
+}
+.monitor__emulator {
+  position: absolute;
+  top: 2vmin;
+  left: 2.5vmin;
+  width: calc(100% - 5vmin);
+  height: calc(100% - 4vmin);
+  border: 0;
+  background: transparent;
+}
+.phone-screen .monitor__emulator {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: min(100%, calc(var(--terminal-height, 100vh) * 592 / 416));
+  height: auto;
+  aspect-ratio: 592 / 416;
 }

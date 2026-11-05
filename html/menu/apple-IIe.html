@@ -6,9 +6,9 @@
   <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Audiowide&amp;display=swap'>
 
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <title>Thoughrights Apple IIe Menu UI</title>
-  <meta property="og:title" content="Thoughrights Apple IIe Menu UI">
-  <meta name="twitter:title" content="Thoughrights Apple IIe Menu UI">
+  <title>Thoughtrights Apple IIe Menu UI</title>
+  <meta property="og:title" content="Thoughtrights Apple IIe Menu UI">
+  <meta name="twitter:title" content="Thoughtrights Apple IIe Menu UI">
   
   <meta name="description" content="Repurposing of a 3D model into a retro site navigation menu.">
   <meta property="og:description" content="Repurposing of a 3D model into a retro site navigation menu.">
@@ -104,6 +104,20 @@
     <div class="bottom"></div>
   </div>
 </div>
+<!-- Desktop: lean in to the screen, or back out to the desk. Double-click
+     on the screen and Esc do the same. -->
+<button class="zoom-toggle" type="button" aria-label="Zoom in on the screen" aria-pressed="false">
+  <svg class="zoom-toggle__in" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"/></svg>
+  <svg class="zoom-toggle__out" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 3v5H3M12 3v5h5M17 12h-5v5M3 12h5v5"/></svg>
+</button>
+<div class="toast" role="status" aria-live="polite"></div>
+<!-- Phones and tablets: the screen the machine zooms into, and the text
+     field that brings up the phone keyboard. Unused on desktop. -->
+<div class="phone-screen"></div>
+<form class="phone-keyboard" autocomplete="off">
+  <input type="text" aria-label="Keyboard" autocomplete="off" autocorrect="off"
+         autocapitalize="characters" spellcheck="false" enterkeyhint="enter">
+</form>
 <div class="key key--template">
   <div class="key__side key__side--top">
     <div class="key__label-top"></div>
@@ -115,6 +129,8 @@
   <div class="key__side key__side--back"></div>
   <div class="key__side key__side--front"></div>
 </div>
+<script  src="js/jszm.js"></script>
+<script  src="js/apple-IIe-programs.js"></script>
 <script  src="js/apple-IIe.js"></script>
 
 </body>
