@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""Search this gopher hole: a type 7 item in the gophermap points here.
+
+Gophernicus runs anything in /cgi-bin/ and passes what the visitor typed
+in QUERY_STRING. This reads the gophermap next door and answers with a
+gopher menu of the links whose name or description has every word.
+"""
+
+import os
+import sys
+
+ROOT = os.environ.get('DOCUMENT_ROOT') or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HOST = os.environ.get('SERVER_NAME', 'localhost')
+PORT = os.environ.get('SERVER_PORT', '70')
+
+
+def info(text):
+    return 'i%s\t\t%s\t%s' % (text, HOST, PORT)
+
+
+def links(path):
+    """(gopher line, the text to search) for each link in a gophermap.
+    A link's description is the indented plain line under it."""
+    found = []
+    with open(path, encoding='utf-8') as gophermap:
+        for line in gophermap.read().splitlines():
+            if not line or line[0] in '#!':
+                continue
+            if '\t' in line:
+                found.append([line, line.split('\t')[0][1:]])
+            elif line.startswith('  ') and found:
+                found[-1][1] += ' ' + line.strip()
+    return found
+
+
+def complete(line):
+    """Fill in host and port the way Gophernicus does for the gophermap."""
+    fields = line.split('\t')
+    fields += [''] * (4 - len(fields))
+    return '\t'.join(fields[:2] + [fields[2] or HOST, fields[3] or PORT])
+
+
+def main():
+    words = os.environ.get('QUERY_STRING', '').lower().split()
+    print(info('SEARCH: ' + ' '.join(words)))
+    print(info(''))
+    hits = [line for line, text in links(os.path.join(ROOT, 'gophermap'))
+            if words and all(word in text.lower() for word in words)]
+    for line in hits:
+        print(complete(line))
+    if not hits:
+        print(info('Nothing here matches.'))
+    print('.')
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -7,6 +7,7 @@ build step, no package to install, and no paid service behind it.
 | --- | --- | --- |
 | `html/` | The web root: `html/menu/` is served as `/menu/` | Yes |
 | `html/menu/proxy/gopher.cgi` | The `BRUN GOPHER` proxy (Python 3, standard library) | Yes, if you want GOPHER |
+| `gopher/` | The site index as a gopher hole, for `gopher://thoughtrights.com/` | Yes, if you run a gopher server |
 | `tests/` | Offline tests for the proxy | No |
 | `tools/dev-server.py` | Local server that also runs the CGI | No |
 | `README.md`, `ROADMAP.md`, `INSTALLATION.md` | Notes | No |
@@ -154,7 +155,94 @@ Last, boot the IIe, type `BRUN GOPHER`, and pick an item.
   `10.x`, `192.168.x` and the EC2 metadata address `169.254.169.254`, so a
   visitor can't use it to reach anything on your network.
 
-## 3. Local development
+## 3. Your own gopher server (`gopher://thoughtrights.com/`)
+
+`gopher/` is the site index as a gopher hole: a `gophermap` with every
+link from the HTML menu, and `cgi-bin/search`, a type 7 search over it.
+It is served by Gophernicus, which Ubuntu packages. This is separate from
+the proxy in step 2: the proxy lets the IIe *visit* gopher, this *is* a
+gopher server, reachable from any gopher client (Lagrange, Lynx,
+`BRUN GOPHER`).
+
+### What the server needs
+
+- Ubuntu's `gophernicus` package (in `universe`, 3.1.1 on 24.04).
+- `python3` for the search script.
+- **Inbound** TCP port 70 in the EC2 security group, from 0.0.0.0/0
+  (and `::/0` for IPv6).
+
+### Steps
+
+1. **Install it.** The package turns on `gophernicus.socket`, which
+   listens on port 70 straight away and starts one `gophernicus` per
+   connection as the `_gophernicus` user:
+
+   ```bash
+   sudo apt install gophernicus
+   ```
+
+2. **Copy the hole to `/srv/gopher`,** Ubuntu's document root for it.
+   Gophernicus skips scripts that aren't world-readable and executable:
+
+   ```bash
+   sudo rsync -av --exclude '*~' gopher/ /srv/gopher/
+   sudo chmod -R a+rX /srv/gopher
+   sudo chmod 755 /srv/gopher/cgi-bin/search
+   ```
+
+3. **Give it the public host name.** Without `-h`, every menu line
+   carries the machine's own name, which on EC2 is something like
+   `ip-172-31-0-1.ec2.internal`, and clients can't follow those links.
+   In `/etc/default/gophernicus`:
+
+   ```bash
+   OPTIONS=-r /srv/gopher -h thoughtrights.com -nf -nt
+   ```
+
+   `-nf` drops the "Gophered by Gophernicus" footer and `-nt` turns off
+   `/server-status`. Then:
+
+   ```bash
+   sudo systemctl restart gophernicus.socket
+   ```
+
+4. **Open port 70** inbound in the instance's security group.
+
+### Check it
+
+From anywhere:
+
+```bash
+printf '\r\n' | nc thoughtrights.com 70 | head
+```
+
+```bash
+printf '/cgi-bin/search\tvideo\r\n' | nc thoughtrights.com 70
+```
+
+The first should print the menu, starting with the line for the title
+(`ithoughtrights.com`, a tab, `TITLE`). The second should list Barzy and
+the other video links. Then try `BRUN GOPHER` and
+`G gopher://thoughtrights.com`.
+
+### Adding to it
+
+- **Links** are lines of `type`, name, tab, selector (and optionally
+  tab, host, tab, port). Lines with no tab are plain text. Web pages are
+  type `h` with a `URL:https://...` selector. See
+  `/usr/share/doc/gophernicus/README.gophermap` on the server.
+- **Text** goes in as files (`0About this site`, a tab, `/about.txt`), which
+  suits the resume, the job post and anything else that is already text.
+- **Programs** go in `cgi-bin/`. A type 7 item sends what the visitor
+  typed in `QUERY_STRING`; whatever the script prints is the reply,
+  either a menu (lines with tabs, ending in `.`) or plain text for a
+  type 0 item. Treat that input as hostile.
+- To be added to Floodgap's list of new servers once it's up, write to
+  gopher@floodgap.com.
+
+The files are offline-tested with `python3 -m unittest discover tests`.
+
+## 4. Local development
 
 You need Python 3 and nothing else.
 
@@ -178,7 +266,7 @@ To try phone mode, open the page in a phone-sized window with touch
 emulation, such as a browser's device toolbar. Phone mode only switches on
 for touch screens without a mouse.
 
-## 4. Changing what's on the disk
+## 5. Changing what's on the disk
 
 Commands, files and programs come from `html/menu/assets/command-data.json`.
 There's nothing to build after editing it; just deploy the file again.

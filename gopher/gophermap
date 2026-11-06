@@ -1,0 +1,70 @@
+!thoughtrights.com
+#
+# The site index as a gopher menu: gopher://thoughtrights.com/
+# Served by Gophernicus from /srv/gopher (see INSTALLATION.md).
+# Fields are separated by ONE tab. Lines without a tab are plain text.
+#
+            * under renewed management *
+
+Founded on April 30 1995.
+
+7Search this site	/cgi-bin/search
+
+EMPLOYMENT
+hMy resume	URL:https://www.thoughtrights.com/resume/
+hResume, 2 pages (PDF)	URL:https://www.thoughtrights.com/resume/2.pdf
+hResume, 3 pages (PDF)	URL:https://www.thoughtrights.com/resume/3.pdf
+
+ARTISTIC
+hSelfeyes	URL:https://www.thoughtrights.com/selfeyes/
+    Reflections of the world in the eyes of selfie photos.
+hApple IIe menu	URL:https://www.thoughtrights.com/menu/apple-IIe.html
+    A 3D Apple IIe that is also the site menu.
+hDaemous	URL:https://www.thoughtrights.com/daemous/
+    Animated SVG brain scan self portrait.
+hSpoken Word	URL:https://www.thoughtrights.com/spoken-word/
+    Player, poetry, and a markup language for neural TTS.
+hWargames interstitials	URL:https://www.thoughtrights.com/WOPR/
+    Gaming interstitials, mostly data and CSS.
+
+SIDE HUSTLE IDEAS
+hFOOD.NET	URL:https://www.food.net/
+    Consumer network.
+hQuiver	URL:https://qr.food.net/
+    Free secure mobile QR codes for restaurants and coffee shops.
+hFood Madness	URL:https://madness.food.net/
+    ML recipe disasters, with reckless image diffusion models.
+hDUNGEONEER.com	URL:https://www.dungeoneer.com/
+htemp3rcast	URL:https://www.thoughtrights.com/weather/
+    Weather forecast and MP3 announcer.
+
+VIDEO SERVICES
+hBarzy	URL:https://www.thoughtrights.com/barzy/
+    The video stream signal checker.
+hLocal VDO WebRTC	URL:https://www.thoughtrights.com/vdo/
+    Participant RTMP video stream mux.
+hNYC traffic cam dashboard	URL:https://www.thoughtrights.com/cam/
+    Navigate NYC traffic cams the way you should be able to.
+
+TECH COMMUNITY
+hTech-Hunterdon	URL:https://github.com/tech-hunterdon
+
+GAMING INTEGRATIONS
+hGaming interstitials	URL:https://www.dungeoneer.com/cgi-bin/dragons/dnd-handout/dnd-interstitials.py
+    Fantasy flavored interstitials from random elements.
+hArmoria	URL:https://www.dungeoneer.com/dungeoneer/shields/
+hAzgaar's Fantasy Map Generator	URL:https://www.dungeoneer.com/dungeoneer/maps/
+hCharacteristics (source)	URL:https://github.com/thoughtrights/characteristics
+    Unique personalities for fake people.
+
+ABANDONED
+hD&DBeyond homebrew integration	URL:https://www.dungeoneer.com/cgi-bin/dragons/dnd-handout/controls.py
+
+SOURCE CODE
+hgithub.com/thoughtrights	URL:https://github.com/thoughtrights
+
+ELSEWHERE IN GOPHERSPACE
+1Floodgap Systems	/	gopher.floodgap.com	70
+1SDF Public Access UNIX	/	sdf.org	70
+
+wiz@thoughtrights.com
