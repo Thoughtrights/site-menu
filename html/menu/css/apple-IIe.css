@@ -680,9 +680,10 @@ body {
   transform: translateY(-50%) rotateX(90deg) translateZ(calc(-1 * var(--height) - 0.6vmin));
   width: var(--width);
   height: var(--depth);
-  background-color: transparent;
-  box-shadow: var(--object-box-shadow-floppy);
-  background-color: black;
+  /* The drive's shadow on the desk. In perspective this face shows past
+     the drive's left side, so it has to be soft, not solid black. */
+  background-color: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 0 2vmin 1vmin rgba(0, 0, 0, 0.22);
 }
 
 .monitor-shadow {
