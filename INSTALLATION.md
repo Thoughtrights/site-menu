@@ -301,9 +301,10 @@ There's nothing to build after editing it; just deploy the file again.
 live in `html/menu/assets/disks/` and are plain files, so deploying them is
 the same `rsync` as the rest of the menu. `.dsk`, `.do` and `.po` work.
 
-`BRUN CASTLE WOLFENSTEIN` expects `assets/disks/castle-wolfenstein.dsk`,
-which isn't in the repository; until it's there, the command prints
-`I/O ERROR`. To add another disk, copy the file in and add an entry like:
+`BRUN KARATEKA` expects `assets/disks/karateka.dsk` and
+`BRUN CASTLE WOLFENSTEIN` expects `assets/disks/castle-wolfenstein.dsk`.
+Neither disk is in the repository; until a file is there, its command
+prints `I/O ERROR`. To add another disk, copy the file in and add an entry like:
 
 ```json
 "BRUN MY GAME" : {

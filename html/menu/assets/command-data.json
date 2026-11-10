@@ -290,6 +290,16 @@
 	"action": "alias",
 	"payload": ["BRUN CASTLE WOLFENSTEIN"]
     },
+    "BRUN KARATEKA" : {
+	"action": "boot",
+	"type": "B",
+	"sectors": 68,
+	"payload": ["assets/disks/karateka.dsk"]
+    },
+    "RUN KARATEKA" : {
+	"action": "alias",
+	"payload": ["BRUN KARATEKA"]
+    },
     "HELP": {
 	"action": "print",
 	"payload": [" \n",
