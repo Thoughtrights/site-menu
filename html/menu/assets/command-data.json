@@ -166,6 +166,12 @@
 	"sectors": 2,
 	"payload": ["https://www.dungeoneer.com/"]
     },
+    "RUN BASEBALL" : {
+	"action": "redirect",
+	"type": "A",
+	"sectors": 12,
+	"payload": ["https://www.thoughtrights.com/baseball-cards/"]
+    },
     "BRUN ALPHACOMPLEX" : {
 	"action": "redirect",
 	"type": "B",
