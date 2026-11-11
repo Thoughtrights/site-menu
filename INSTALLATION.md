@@ -266,7 +266,9 @@ python3 -m unittest discover tests
 GitHub Actions runs them on every pull request and every push to `master`, and
 also checks that the JavaScript parses (`.github/workflows/checks.yml`). A
 `boot` entry whose disk you've chosen not to ship must be listed in
-`DISKS_NOT_SHIPPED` in `tests/test_site.py`.
+`DISKS_NOT_SHIPPED` in `tests/test_site.py` and in `.gitignore`. The tests
+then check that the disk is never committed; a copy in your working tree is
+fine.
 
 To try phone mode, open the page in a phone-sized window with touch
 emulation, such as a browser's device toolbar. Phone mode only switches on
@@ -309,8 +311,9 @@ the same `rsync` as the rest of the menu. `.dsk`, `.do` and `.po` work.
 
 `BRUN KARATEKA` expects `assets/disks/karateka.dsk` and
 `BRUN CASTLE WOLFENSTEIN` expects `assets/disks/castle-wolfenstein.dsk`.
-Neither disk is in the repository; until a file is there, its command
-prints `I/O ERROR`. To add another disk, copy the file in and add an entry like:
+Neither disk is in the repository, which is public, and `.gitignore` keeps
+them out. Put your own copy there before deploying; until a file is there,
+its command prints `I/O ERROR`. To add another disk, copy the file in and add an entry like:
 
 ```json
 "BRUN MY GAME" : {

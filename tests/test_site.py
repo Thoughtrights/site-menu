@@ -7,14 +7,18 @@ import json
 import os
 import re
 import stat
+import subprocess
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MENU = os.path.join(HERE, '..', 'html', 'menu')
 MAX_ALIAS_HOPS = 5  # resolveCommand in js/apple-IIe.js gives up after this
 
-# Catalog entries whose disk we've chosen not to ship. See ROADMAP.md.
-DISKS_NOT_SHIPPED = {'assets/disks/castle-wolfenstein.dsk'}
+# Catalog entries whose disk stays out of the repository, which is public:
+# commercial games nobody can give us permission to share. A copy may sit in
+# your working tree for testing or deploying; .gitignore keeps it out of git.
+DISKS_NOT_SHIPPED = {'assets/disks/castle-wolfenstein.dsk',
+                     'assets/disks/karateka.dsk'}
 ACTIONS = {'print', 'redirect', 'catalog', 'program', 'boot', 'alias', 'reserved'}
 
 
@@ -81,10 +85,29 @@ class CommandDataTest(unittest.TestCase):
             if disk not in DISKS_NOT_SHIPPED:
                 self.assertTrue(exists(disk), '%s needs %s' % (name, disk))
 
-    def test_disks_not_shipped_are_really_absent(self):
-        # Once a disk is added, it should get the same check as the others.
+    def test_disks_not_shipped_stay_out_of_git(self):
+        # A local copy is fine; a committed one would be public.
+        try:
+            tracked = subprocess.run(
+                ['git', 'ls-files', '--'] + sorted(DISKS_NOT_SHIPPED),
+                cwd=MENU, capture_output=True, text=True, check=True).stdout.split()
+        except (OSError, subprocess.CalledProcessError):
+            self.skipTest('not a git checkout')
+        self.assertEqual(tracked, [], 'these disks must not be committed')
+
+    def test_disks_not_shipped_are_ignored(self):
+        # So that `git add .` can't pick one up by accident.
+        try:
+            result = subprocess.run(
+                ['git', 'check-ignore', '--no-index', '--'] + sorted(DISKS_NOT_SHIPPED),
+                cwd=MENU, capture_output=True, text=True)
+        except OSError:
+            self.skipTest('git is not installed')
+        if result.returncode > 1:  # 1 means "nothing ignored"
+            self.skipTest('not a git checkout')
+        ignored = result.stdout.split()
         for disk in DISKS_NOT_SHIPPED:
-            self.assertFalse(exists(disk), 'remove %s from DISKS_NOT_SHIPPED' % disk)
+            self.assertIn(disk, ignored, 'add %s to .gitignore' % disk)
 
 
 class FilesTest(unittest.TestCase):

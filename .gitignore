@@ -1,1 +1,6 @@
 __pycache__/
+
+# Commercial disks: fine to keep a copy here, never to commit one.
+# Listed in DISKS_NOT_SHIPPED in tests/test_site.py.
+html/menu/assets/disks/castle-wolfenstein.dsk
+html/menu/assets/disks/karateka.dsk
