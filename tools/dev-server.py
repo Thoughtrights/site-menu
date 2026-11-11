@@ -19,7 +19,10 @@ import urllib.request
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'html')
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
-BASEBALL_CARDS = 'https://raw.githubusercontent.com/Thoughtrights/baseball-cards/main/'
+PROJECTS = {  # web directory: where its files are on GitHub
+    'baseball-cards': 'https://raw.githubusercontent.com/Thoughtrights/baseball-cards/main/',
+    'barzy': 'https://raw.githubusercontent.com/Thoughtrights/barzy/main/',
+}
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -28,26 +31,29 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=ROOT, **kwargs)
 
     def do_GET(self):
-        self.fetch_baseball_card()
+        self.fetch_from_project()
         super().do_GET()
 
-    def fetch_baseball_card(self):
-        # RUN BASEBALL reads /baseball-cards/, which the live site has and
-        # this repository doesn't. The first time a file there is asked
-        # for, copy it from the public baseball-cards repository and keep
-        # it (html/baseball-cards/ is gitignored). The scans are 258 MB in
+    def fetch_from_project(self):
+        # Programs on the Apple read other projects' files, which the live
+        # site has and this repository doesn't: /baseball-cards/ for RUN
+        # BASEBALL, /barzy/ for BRUN BARZY. The first time one is asked
+        # for, copy it from that project's public repository and keep it
+        # (both directories are gitignored). The card scans are 258 MB in
         # all, so only the ones looked at come down.
-        match = re.fullmatch(r'/baseball-cards/([A-Za-z0-9._-]+\.(?:jpg|json))', self.path.split('?')[0])
-        if not match:
+        match = re.fullmatch(r'/([a-z-]+)/((?:[A-Za-z0-9_-]+/)?[A-Za-z0-9_-][A-Za-z0-9._-]*'
+                             r'\.(?:jpg|png|json|wav))', self.path.split('?')[0])
+        if not match or match.group(1) not in PROJECTS:
             return
-        local = os.path.join(ROOT, 'baseball-cards', match.group(1))
+        project, name = match.groups()
+        local = os.path.join(ROOT, project, name)
         if os.path.isfile(local):
             return
         try:
-            with urllib.request.urlopen(BASEBALL_CARDS + match.group(1), timeout=20) as response:
+            with urllib.request.urlopen(PROJECTS[project] + name, timeout=20) as response:
                 body = response.read()
         except OSError as error:
-            sys.stderr.write('baseball-cards: %s: %s\n' % (match.group(1), error))
+            sys.stderr.write('%s: %s: %s\n' % (project, name, error))
             return
         os.makedirs(os.path.dirname(local), exist_ok=True)
         with open(local, 'wb') as f:

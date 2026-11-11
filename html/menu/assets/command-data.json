@@ -28,10 +28,10 @@
 	"payload": ["https://www.thoughtrights.com/resume/"]
     },
     "BRUN BARZY" : {
-	"action": "redirect",
+	"action": "program",
 	"type": "B",
 	"sectors": 30,
-	"payload": ["https://www.thoughtrights.com/barzy/"]
+	"payload": ["barzy", "/barzy/assets/"]
     },
     "RUN BARZY" : {
 	"action": "alias",

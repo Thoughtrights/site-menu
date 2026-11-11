@@ -422,6 +422,16 @@ function setUpPhone() {
 	    resumeOutput();
 	    return;
 	}
+	if (program && program.allKeys && acceptingInput()) {
+	    // A program that takes every key: each typed character is one.
+	    const typed = phoneInput.value;
+	    phoneInput.value = '';
+	    const current = program;
+	    for (const character of typed) {
+		runProgramStep(() => current.key(character));
+	    }
+	    return;
+	}
 	if (!acceptingInput()) {
 	    phoneInput.value = ''; // the machine is off or busy
 	    return;
@@ -446,6 +456,9 @@ function setUpPhone() {
 	phoneInput.value = '';
 	if (resumeOutput && on) {
 	    resumeOutput();
+	} else if (program && program.allKeys && acceptingInput()) {
+	    const current = program;
+	    runProgramStep(() => current.key('Enter'));
 	} else if (acceptingInput()) {
 	    processCommand(lines[line]);
 	    render();
@@ -806,9 +819,11 @@ document.addEventListener('keydown', (event) => {
 	return; // the machine is off or busy
     }
 
-    if (program && program.key && (isArrow || isPageKey)) {
+    if (program && program.key &&
+	(isArrow || isPageKey || (program.allKeys && !['Shift', 'Control', 'CapsLock'].includes(event.key)))) {
 	// A program that takes these keys gets them straight away (a
-	// highlight bar), rather than waiting for RETURN.
+	// highlight bar, or a game), rather than waiting for RETURN.
+	event.preventDefault();
 	const current = program;
 	runProgramStep(() => current.key(event.key));
 	return;
@@ -936,7 +951,31 @@ function makeMachine(token) {
 		// box: { column, row, columns, rows }. Resolves once drawn.
 		return alive() ? drawPicture(url, box) : Promise.resolve();
 	    },
+	    screen(rows) {
+		// A dot buffer to draw on every frame; see graphicsScreen().
+		const screen = graphicsScreen(rows);
+		const show = screen.show;
+		screen.show = () => {
+		    if (alive()) {
+			show();
+		    }
+		};
+		return screen;
+	    },
+	    bitmap(url, width, height) {
+		// An image as brightness and coverage per dot, for sprites.
+		return loadBitmap(url, width, height);
+	    },
 	},
+	sound: {
+	    load: (url) => loadSound(url),
+	    play(sound, volume) {
+		if (alive()) {
+		    playSound(sound, volume);
+		}
+	    },
+	},
+	running: () => alive(), // false once the program is broken off: stop animating
 	work(promise) {
 	    // Wait for the network with the drive light on and input off.
 	    if (!alive()) {
@@ -1345,6 +1384,102 @@ async function drawPicture(url, box) {
 	    }
 	}
     }
+}
+
+function graphicsScreen(rows) {
+    /* A hi-res screen for a program to draw on every frame: 280 dots
+     * across and `rows` text rows (8 dots each) down from the top, the
+     * rest of the screen left to the text below, as in the IIe's mixed
+     * mode. Set dots[y * width + x] to 1 for a lit dot, then show(). */
+    const width = 280;
+    const height = rows * 8;
+    const dots = new Uint8Array(width * height);
+    let layer = null;
+    let image = null;
+    let color = null;
+    return {
+	width,
+	height,
+	dots,
+	show() {
+	    if (!layer || layer.dotWidth !== (columns === 80 ? 2 : 1) || !graphicsCanvas) {
+		layer = graphicsLayer(); // measured once, again only if the screen changes
+		const context = layer.canvas.getContext('2d');
+		image = context.createImageData(width * layer.dotWidth, height);
+		color = getComputedStyle(terminal).color.match(/\d+/g).map(Number);
+	    }
+	    const pixels = image.data;
+	    const dotWidth = layer.dotWidth;
+	    for (let y = 0; y < height; y++) {
+		for (let x = 0; x < width; x++) {
+		    const lit = dots[y * width + x];
+		    for (let d = 0; d < dotWidth; d++) {
+			const p = (y * width * dotWidth + x * dotWidth + d) * 4;
+			pixels[p] = color[0];
+			pixels[p + 1] = color[1];
+			pixels[p + 2] = color[2];
+			pixels[p + 3] = lit ? 255 : 0;
+		    }
+		}
+	    }
+	    layer.canvas.getContext('2d').putImageData(image, 0, 0);
+	},
+    };
+}
+
+async function loadBitmap(url, width, height) {
+    /* An image scaled to width x height dots, as brightness (0-1) and
+     * coverage (0-1) per dot, for a program to turn into a sprite. */
+    const image = await loadImage(url);
+    const work = document.createElement('canvas');
+    work.width = width;
+    work.height = height;
+    const context = work.getContext('2d', { willReadFrequently: true });
+    context.drawImage(image, 0, 0, width, height);
+    const pixels = context.getImageData(0, 0, width, height).data;
+    const level = new Float32Array(width * height);
+    const alpha = new Float32Array(width * height);
+    for (let i = 0; i < level.length; i++) {
+	level[i] = (0.299 * pixels[i * 4] + 0.587 * pixels[i * 4 + 1] + 0.114 * pixels[i * 4 + 2]) / 255;
+	alpha[i] = pixels[i * 4 + 3] / 255;
+    }
+    return { width, height, level, alpha };
+}
+
+/* Sound, with Web Audio: one context for the machine, made the first time
+ * a program asks (after a key press, which browsers require). */
+let audio = null;
+
+function audioContext() {
+    if (!audio) {
+	audio = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audio.state === 'suspended') {
+	audio.resume();
+    }
+    return audio;
+}
+
+async function loadSound(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+	throw new Error(url + ': ' + response.status);
+    }
+    return audioContext().decodeAudioData(await response.arrayBuffer());
+}
+
+function playSound(sound, volume) {
+    // volume 0-1; 0 plays nothing.
+    if (!sound || volume <= 0) {
+	return;
+    }
+    const context = audioContext();
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    gain.gain.value = volume;
+    source.buffer = sound;
+    source.connect(gain).connect(context.destination);
+    source.start();
 }
 
 function readFromFloppy(seconds) {

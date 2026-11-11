@@ -71,17 +71,23 @@ dithered into green dots, and "also in the box" counts. What's left:
   origin as the Apple, so no proxy. On the dev server they come from the
   public baseball-cards repository the first time they're asked for.
 
-### Barzy: heavy, but later
+### Barzy
 
-An audio/video sync test: the mascot bounces, beeping at each edge, so an
-engineer can see whether sound and picture land together.
+`BRUN BARZY` runs it on the Apple: the mascot bounces over Barzy's colour
+bars, drawn as dot densities, and the edge it hits lights on the same frame
+its bounce sound starts (Barzy's own sounds). Graphics on top, three rows of
+text below: a bounce counter, the edge just hit, and the audio level, 0 to
+11, starting silent as the web page does. Up and down set the level, SPACE
+mutes, Q quits. What's left:
 
-- [ ] Needs all of the groundwork: the screen and keys, the graphics layer,
-      and Web Audio, with the beep and the edge flash on the same frame.
-- [ ] The mascot doesn't read once dithered in the mockup. Try again (a
-      bigger figure, fewer tones) before building.
 - [ ] Decide whether to keep the bounce counter, which Barzy's web page
       doesn't have.
+- [ ] Phones: no arrow keys, so typing `+` and `-` changes the level. Not
+      tried on a real phone.
+- [ ] A way to the web page, which `BRUN BARZY` used to open.
+- [ ] Sound and picture can't be closer than the browser lets them: the
+      sound starts on the frame the edge lights, but the browser's own audio
+      delay isn't allowed for.
 
 ### Resume: light, mostly writing
 
@@ -358,12 +364,12 @@ baseball browser and Barzy need the first three):
       prompt, the modem, the BBS, the browser, a game, each exiting back to
       the one before. Started: a program can take the arrow and page keys
       (`key()`), redraw the screen at once, and show inverse lines.
-- [ ] The graphics layer: built as a canvas over the text, lined up with its
-      cells (7x8 dots each; on 80 columns a hi-res dot is two canvas pixels
-      wide), with `machine.graphics.picture()` for dithered photos. Still to
-      come: drawing dots and lines for Barzy, and mixed mode (graphics over
-      four rows of text).
-- [ ] Sound with Web Audio: Barzy's beep, the modem, the drive.
+- [x] The graphics layer: a canvas over the text, lined up with its cells
+      (7x8 dots each; on 80 columns a hi-res dot is two canvas pixels wide).
+      `picture()` for dithered photos, `screen(rows)` for a dot buffer drawn
+      every frame over the top rows (mixed mode), `bitmap()` for sprites.
+- [ ] Sound with Web Audio: started (`machine.sound`, playing samples, used
+      by Barzy). Still to come: the modem's tones and the drive.
 - [ ] One input function that every source (physical keys, on-screen keys,
       phone field) feeds into.
 - [ ] One output queue with a speed setting (normal, 300 baud, 1200 baud) and

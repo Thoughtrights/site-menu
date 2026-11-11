@@ -17,6 +17,8 @@
  * Either may return a promise. If one throws, DOS prints I/O ERROR.
  * A program may also have key(name): it then gets the arrow keys and
  * PageUp/PageDown as they're pressed ("ArrowUp" ...), for a highlight bar.
+ * With allKeys: true as well, it gets every key that way ("q", " ",
+ * "Enter"), for something that runs in real time.
  *
  *   machine.print(lines)     print lines, then the current prompt
  *   machine.show(lines)      clear the screen, draw lines quickly, then the prompt
@@ -25,6 +27,11 @@
  *   machine.graphics.clear()               wipe the hi-res dots
  *   machine.graphics.picture(url, box)     a photo, dithered to dots, in a box
  *                            of text cells { column, row, columns, rows }
+ *   machine.graphics.screen(rows)          280 dots across, rows*8 down: set
+ *                            .dots[y * 280 + x] = 1, then .show(), each frame
+ *   machine.graphics.bitmap(url, w, h)     an image as brightness and coverage
+ *   machine.sound.load(url) / .play(sound, volume 0-1)
+ *   machine.running()        false once the program is broken off
  *   machine.setPrompt(text)  the prompt to type at ("SEARCH? ", "?" ...)
  *   machine.work(promise)    wait for the network, drive light on
  *   machine.exit()           back to the DOS "]" prompt
@@ -494,6 +501,232 @@ PROGRAMS.baseball = (machine, url) => {
 		  ? 1 : listRows();
 	    moveCursor(cursor + (forward ? step : -step));
 	    return listScreen(true);
+	},
+    };
+};
+
+
+/* BRUN BARZY: Barzy, the audio/video sync checker, on a green screen.
+ * The mascot bounces over colour bars, drawn as dot densities the way a
+ * monochrome monitor showed them. Each time it hits an edge, that edge
+ * flashes on the same frame as Barzy's bounce sound, so an engineer can
+ * see whether a stream's sound and picture land together.
+ * payload: ["barzy", "<url of Barzy's assets/>"], on the same site. */
+PROGRAMS.barzy = (machine, assets) => {
+    const ROWS = 20;            // graphics rows; three rows of text below
+    const SPEED = 75;           // dots a second, across and down (Barzy's page: 500 px)
+    const FLASH_MS = 100;       // how long an edge stays lit
+    const SPRITE = { width: 56, height: 51 };
+    const LEVELS = 11;          // Barzy's audio level runs 0 to 11
+    // 4x4 ordered dither: steady patterns, so the bars don't crawl.
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+
+    let screen = null;
+    let background = null;
+    let sprite = null;          // per dot: 0 clear, 1 lit, 2 dark (covers the bars)
+    const sounds = {};
+    let level = 0;              // starts silent, as Barzy does
+    let savedLevel = 6;         // what SPACE brings back
+    let x = 0, y = 0;
+    let dx = SPEED, dy = SPEED;
+    let bounces = 0;
+    let lastEdge = '';
+    const flashUntil = { LEFT: 0, RIGHT: 0, TOP: 0, BOTTOM: 0 };
+    let lastFrame = null;
+    let stopped = false;
+
+    const width = () => machine.columns();
+    const twoSided = (left, right) =>
+	  toAscii(left).slice(0, Math.max(0, width() - right.length - 1))
+	  .padEnd(Math.max(0, width() - right.length - 1)) + ' ' + right;
+
+    function bars(w, h) {
+	/* Barzy's bars as brightness, then dithered to dots. Brightness is
+	 * each colour's luma, which is how it looked in green. */
+	const level = new Float32Array(w * h);
+	const luma = (hex) => {
+	    const n = parseInt(hex, 16);
+	    return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+	};
+	const gradient = (from, to) => (t) => from + (to - from) * t;
+	const bands = [ // [height share, [[width share, brightness or ramp], ...]]
+	    [0.55, ['646464', 'c0c0c0', 'ffff00', '00ffff', '00ff00', 'ff00ff', 'ff0000', '0000ff', '646464']
+	     .map((hex) => [1 / 9, luma(hex)])],
+	    [0.10, [[1 / 9, luma('00ffff')], [1 / 9, luma('0000ff')], [6 / 9, gradient(1, luma('808080'))],
+		    [1 / 9, luma('0000ff')]]],
+	    [0.10, [[1 / 9, luma('ffff00')], [1 / 9, luma('800080')], [6 / 9, gradient(0, 1)],
+		    [1 / 9, luma('ff0000')]]],
+	    [0.25, [[0.1111, luma('282828')], [0.173, 0], [0.21, 1], [0.173, 0],
+		    [0.037, luma('0a0a0a')], [0.037, 0], [0.037, luma('323232')], // PLUGE
+		    [0.1111, 0], [0.1111, luma('282828')]]],
+	];
+	let top = 0;
+	for (const [share, columns] of bands) {
+	    const bottom = Math.round(top + share * h);
+	    let left = 0;
+	    columns.forEach(([part, value], i) => {
+		const right = i === columns.length - 1 ? w : Math.round(left + part * w);
+		for (let yy = top; yy < Math.min(bottom, h); yy++) {
+		    for (let xx = left; xx < right; xx++) {
+			level[yy * w + xx] = typeof value === 'function'
+			    ? value((xx - left) / Math.max(1, right - left - 1)) : value;
+		    }
+		}
+		left = right;
+	    });
+	    top = bottom;
+	}
+	const dots = new Uint8Array(w * h);
+	for (let yy = 0; yy < h; yy++) {
+	    for (let xx = 0; xx < w; xx++) {
+		dots[yy * w + xx] = level[yy * w + xx] > BAYER[(yy & 3) * 4 + (xx & 3)] ? 1 : 0;
+	    }
+	}
+	return dots;
+    }
+
+    function makeSprite(bitmap) {
+	/* The mascot in three flat tones (light parts lit, middle ones a
+	 * checkerboard, dark ones dark) inside a lit outline with a dark ring
+	 * just inside it, so it stands out against any bar. */
+	const { width: w, height: h, level: light, alpha } = bitmap;
+	const inside = (xx, yy) => xx >= 0 && yy >= 0 && xx < w && yy < h && alpha[yy * w + xx] > 0.5;
+	const edgeDistance = (xx, yy) => {
+	    for (let d = 1; d <= 2; d++) {
+		for (const [ox, oy] of [[d, 0], [-d, 0], [0, d], [0, -d]]) {
+		    if (!inside(xx + ox, yy + oy)) {
+			return d;
+		    }
+		}
+	    }
+	    return 3;
+	};
+	const tones = new Uint8Array(w * h);
+	for (let yy = 0; yy < h; yy++) {
+	    for (let xx = 0; xx < w; xx++) {
+		if (!inside(xx, yy)) {
+		    continue;
+		}
+		const d = edgeDistance(xx, yy);
+		const v = light[yy * w + xx];
+		const lit = d === 1 || (d > 2 && (v > 0.7 || (v > 0.35 && ((xx + yy) & 1))));
+		tones[yy * w + xx] = lit ? 1 : 2;
+	    }
+	}
+	return { width: w, height: h, tones };
+    }
+
+    function bounce(edge) {
+	bounces++;
+	lastEdge = edge;
+	flashUntil[edge] = performance.now() + FLASH_MS;
+	const sound = edge === 'LEFT' ? sounds.left : edge === 'RIGHT' ? sounds.right : sounds.topBottom;
+	machine.sound.play(sound, level / LEVELS); // the same frame the edge lights
+	status();
+    }
+
+    function step(seconds) {
+	const maxX = screen.width - sprite.width;
+	const maxY = screen.height - sprite.height;
+	x += dx * seconds;
+	y += dy * seconds;
+	if (x >= maxX) { x = maxX - (x - maxX); dx = -SPEED; bounce('RIGHT'); }
+	if (x <= 0) { x = -x; dx = SPEED; bounce('LEFT'); }
+	if (y >= maxY) { y = maxY - (y - maxY); dy = -SPEED; bounce('BOTTOM'); }
+	if (y <= 0) { y = -y; dy = SPEED; bounce('TOP'); }
+    }
+
+    function draw(now) {
+	const { width: w, height: h, dots } = screen;
+	dots.set(background);
+	const band = (x0, y0, x1, y1) => {
+	    for (let yy = y0; yy < y1; yy++) dots.fill(1, yy * w + x0, yy * w + x1);
+	};
+	if (now < flashUntil.LEFT) band(0, 0, 3, h);
+	if (now < flashUntil.RIGHT) band(w - 3, 0, w, h);
+	if (now < flashUntil.TOP) band(0, 0, w, 3);
+	if (now < flashUntil.BOTTOM) band(0, h - 3, w, h);
+	const left = Math.round(x);
+	const top = Math.round(y);
+	for (let yy = 0; yy < sprite.height; yy++) {
+	    for (let xx = 0; xx < sprite.width; xx++) {
+		const tone = sprite.tones[yy * sprite.width + xx];
+		if (tone) {
+		    dots[(top + yy) * w + left + xx] = tone === 1 ? 1 : 0;
+		}
+	    }
+	}
+	screen.show();
+    }
+
+    function frame(now) {
+	if (stopped || !machine.running()) {
+	    return;
+	}
+	const seconds = lastFrame === null ? 0 : Math.min(0.1, (now - lastFrame) / 1000);
+	lastFrame = now;
+	step(seconds);
+	draw(now);
+	requestAnimationFrame(frame);
+    }
+
+    function status() {
+	const narrow = width() < 80;
+	const meter = '#'.repeat(level) + '.'.repeat(LEVELS - level);
+	const heard = lastEdge ? lastEdge + ' EDGE  ' + (level ? '*BEEP*' : '(MUTED)') : ' ';
+	machine.redraw([
+	    ...Array(ROWS).fill(' '),
+	    twoSided(narrow ? 'BARZY' : 'BARZY   AUDIO/VIDEO SYNC TEST',
+		     'BOUNCE ' + String(bounces).padStart(4, '0')),
+	    twoSided(heard, (narrow ? 'LEVEL ' : 'AUDIO LEVEL ') + String(level).padStart(2) + ' ' + meter),
+	]);
+    }
+
+    return {
+	allKeys: true, // every key comes to key(), at once
+	start() {
+	    machine.setPrompt(width() < 80 ? 'UP/DOWN  SPACE MUTE  Q QUIT '
+			      : 'UP/DOWN LEVEL   SPACE MUTE   Q QUIT ');
+	    const quietly = (promise) => promise.catch(() => null); // no sound beats no Barzy
+	    return machine.work(Promise.all([
+		machine.graphics.bitmap(assets + 'barzy-boi-trans.png', SPRITE.width, SPRITE.height),
+		quietly(machine.sound.load(assets + 'bounce-left.wav')),
+		quietly(machine.sound.load(assets + 'bounce-right.wav')),
+		quietly(machine.sound.load(assets + 'bounce-topbottom.wav')),
+	    ])).then(([bitmap, left, right, topBottom]) => {
+		Object.assign(sounds, { left, right, topBottom });
+		sprite = makeSprite(bitmap);
+		screen = machine.graphics.screen(ROWS);
+		background = bars(screen.width, screen.height);
+		status();
+		requestAnimationFrame(frame);
+	    });
+	},
+	key(name) {
+	    if (name === 'q' || name === 'Q' || name === 'Escape') {
+		stopped = true;
+		machine.graphics.clear();
+		machine.exit();
+		return machine.print([' ']);
+	    }
+	    if (['ArrowUp', 'ArrowRight', '+', '='].includes(name)) {
+		level = Math.min(LEVELS, level + 1);
+	    } else if (['ArrowDown', 'ArrowLeft', '-'].includes(name)) {
+		level = Math.max(0, level - 1);
+	    } else if (name === ' ') {
+		if (level) {
+		    savedLevel = level;
+		    level = 0;
+		} else {
+		    level = savedLevel;
+		}
+	    } else {
+		return;
+	    }
+	    status();
+	},
+	input() {
+	    // Every key goes to key(); nothing is typed at a prompt.
 	},
     };
 };
