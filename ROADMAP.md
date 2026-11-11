@@ -60,9 +60,13 @@ dithered into green dots, and "also in the box" counts. What's left:
 - [ ] Phones: no arrow keys on a phone keyboard (type a number instead), and
       no picture at 40 columns, where the card's text fills the screen.
 - [ ] A way to the web page, which `RUN BASEBALL` used to open.
-- [ ] Data error, in the baseball-cards repository: the two "Art Houtteman"
-      records point at different scans, and `1954081-398918245-front.jpg`
-      is Jim Hegan. There may be others like it.
+- [ ] Data errors, in the baseball-cards repository:
+  - The two "Art Houtteman" records point at different scans, and
+    `1954081-398918245-front.jpg` is Jim Hegan. There may be others like it.
+  - 12 records are blank but for the photo: never identified. 11 have a
+    photo of an ordinary card (among them Jake Thies, Paul Schreiber, Jim
+    Busby and Whitey Lockman, sideways 1955 cards and a coach), and the
+    last has no photo either. They list as "(no name)".
 - Data: `/baseball-cards/baseballCards.json` and the scans beside it, same
   origin as the Apple, so no proxy. On the dev server they come from the
   public baseball-cards repository the first time they're asked for.

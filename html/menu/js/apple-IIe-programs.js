@@ -201,6 +201,7 @@ PROGRAMS.baseball = (machine, url) => {
     function load(data) {
 	cards = data.map((card) => ({
 	    name: toAscii(card.playerName || '') || '(no name)',
+	    searchName: toAscii(card.playerName || '').toLowerCase(), // not the placeholder
 	    team: toAscii(card.team || '') || '(no team)',
 	    set: toAscii(card.setName || '') || '(no set)',
 	    number: toAscii(card.cardNumber || '') || '-',
@@ -217,7 +218,7 @@ PROGRAMS.baseball = (machine, url) => {
 	const word = find && find.toLowerCase();
 	shown = cards.filter((card) =>
 	    (!team || card.team === team) && (!set || card.set === set) &&
-		(!word || card.name.toLowerCase().includes(word)));
+		(!word || card.searchName.includes(word)));
 	shown.sort(SORTS[sort][1]);
 	top = 0;
 	cursor = 0;
