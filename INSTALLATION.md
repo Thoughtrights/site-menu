@@ -10,7 +10,7 @@ build step, no package to install, and no paid service behind it.
 | `gopher/` | The site index as a gopher hole, for `gopher://thoughtrights.com/` | Yes, if you run a gopher server |
 | `tests/` | Offline tests for the proxy | No |
 | `tools/dev-server.py` | Local server that also runs the CGI | No |
-| `README.md`, `ROADMAP.md`, `INSTALLATION.md` | Notes | No |
+| `README.md`, `ROADMAP.md`, `INSTALLATION.md`, `CI-CD-PLAN.md` | Notes | No |
 
 ## 1. The menu (static files)
 
@@ -27,6 +27,31 @@ visitor's browser, so it needs nothing on the server.
 
 The page is `/menu/apple-IIe.html`. `/menu/index.html` is the plain HTML
 menu.
+
+The Apple page names its address in one place, `<base href="/menu/">`, so
+that it also works as the front page; everything else is relative. To serve
+it somewhere else, change that line (the planned `deploy/deploy.sh uat` does
+this for `/menu-uat/`; see [CI-CD-PLAN.md](CI-CD-PLAN.md)).
+
+### The Apple as the front page (optional)
+
+To open the site on the Apple at `/`, have Apache serve the Apple page for
+the root directory. In the site's `<VirtualHost>`:
+
+```apache
+<Directory /path/to/docroot>
+    DirectoryIndex /menu/apple-IIe.html index.html
+</Directory>
+```
+
+The address stays `/`, and the page's `<base>` keeps its files coming from
+`/menu/`. `/index.html` is still the old title page, and the line under the
+desk links the plain menu for search engines, screen readers and anyone in
+a hurry. To undo it, remove the line and reload Apache. This changes the
+live front page, so check it on the server first with
+`sudo apache2ctl configtest`.
+
+The dev server already serves the Apple at http://localhost:8765/.
 
 ## 2. The gopher proxy (`BRUN GOPHER`)
 
@@ -265,10 +290,11 @@ python3 -m unittest discover tests
 
 GitHub Actions runs them on every pull request and every push to `master`, and
 also checks that the JavaScript parses (`.github/workflows/checks.yml`). A
-`boot` entry whose disk you've chosen not to ship must be listed in
+`boot` entry whose disk we may not redistribute in git must be listed in
 `DISKS_NOT_SHIPPED` in `tests/test_site.py` and in `.gitignore`. The tests
 then check that the disk is never committed; a copy in your working tree is
-fine.
+fine, and is what the planned `deploy/deploy.sh` sends to the server. Every
+other disk is in git.
 
 To try phone mode, open the page in a phone-sized window with touch
 emulation, such as a browser's device toolbar. Phone mode only switches on
@@ -309,11 +335,11 @@ There's nothing to build after editing it; just deploy the file again.
 live in `html/menu/assets/disks/` and are plain files, so deploying them is
 the same `rsync` as the rest of the menu. `.dsk`, `.do` and `.po` work.
 
-`BRUN KARATEKA` expects `assets/disks/karateka.dsk` and
-`BRUN CASTLE WOLFENSTEIN` expects `assets/disks/castle-wolfenstein.dsk`.
-Neither disk is in the repository, which is public, and `.gitignore` keeps
-them out. Put your own copy there before deploying; until a file is there,
-its command prints `I/O ERROR`. To add another disk, copy the file in and add an entry like:
+Disks we may redistribute (Eamon, ProDOS) are in the repository.
+`BRUN KARATEKA` expects `assets/disks/karateka.dsk`, which is deliberately
+not: the repository is public, and `.gitignore` keeps it out. Keep your own
+copy there and it goes to the server with each deploy; until a file is
+there, the command prints `I/O ERROR`. To add another disk, copy the file in and add an entry like:
 
 ```json
 "BRUN MY GAME" : {

@@ -138,6 +138,16 @@
 		    "(908) 735-4207 [fax]\n",
 		    " \n"]
     },
+    "BRUN SELFEYES" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 12,
+	"payload": ["https://www.thoughtrights.com/selfeyes/"]
+    },
+    "RUN SELFEYES" : {
+	"action": "alias",
+	"payload": ["BRUN SELFEYES"]
+    },
     "BRUN DAEMOUS" : {
 	"action": "redirect",
 	"type": "B",
@@ -154,17 +164,113 @@
 	"sectors": 40,
 	"payload": ["https://www.thoughtrights.com/spoken-word/"]
     },
+    "BRUN WOPR" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 16,
+	"payload": ["https://www.thoughtrights.com/WOPR/"]
+    },
+    "RUN WOPR" : {
+	"action": "alias",
+	"payload": ["BRUN WOPR"]
+    },
     "RUN FOODNET" : {
 	"action": "redirect",
 	"type": "A",
 	"sectors": 2,
 	"payload": ["https://www.food.net/"]
     },
+    "BRUN QUIVER" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 6,
+	"payload": ["https://qr.food.net/"]
+    },
+    "RUN QUIVER" : {
+	"action": "alias",
+	"payload": ["BRUN QUIVER"]
+    },
+    "BRUN FOOD MADNESS" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 11,
+	"payload": ["https://madness.food.net/"]
+    },
+    "RUN FOOD MADNESS" : {
+	"action": "alias",
+	"payload": ["BRUN FOOD MADNESS"]
+    },
     "RUN DUNGEONEER" : {
 	"action": "redirect",
 	"type": "A",
 	"sectors": 2,
 	"payload": ["https://www.dungeoneer.com/"]
+    },
+    "BRUN TEMP3RCAST" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 7,
+	"payload": ["https://www.thoughtrights.com/weather/"]
+    },
+    "RUN TEMP3RCAST" : {
+	"action": "alias",
+	"payload": ["BRUN TEMP3RCAST"]
+    },
+    "BRUN VDO" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 14,
+	"payload": ["https://www.thoughtrights.com/vdo/"]
+    },
+    "RUN VDO" : {
+	"action": "alias",
+	"payload": ["BRUN VDO"]
+    },
+    "BRUN NYC CAM" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 9,
+	"payload": ["https://www.thoughtrights.com/cam/"]
+    },
+    "RUN NYC CAM" : {
+	"action": "alias",
+	"payload": ["BRUN NYC CAM"]
+    },
+    "OPEN TECH-HUNTERDON" : {
+	"action": "redirect",
+	"type": "T",
+	"sectors": 3,
+	"payload": ["https://github.com/tech-hunterdon"]
+    },
+    "BRUN GAMING INTERSTITIALS" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 10,
+	"payload": ["https://www.dungeoneer.com/cgi-bin/dragons/dnd-handout/dnd-interstitials.py"]
+    },
+    "RUN GAMING INTERSTITIALS" : {
+	"action": "alias",
+	"payload": ["BRUN GAMING INTERSTITIALS"]
+    },
+    "BRUN ARMORIA" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 9,
+	"payload": ["https://www.dungeoneer.com/dungeoneer/shields/"]
+    },
+    "RUN ARMORIA" : {
+	"action": "alias",
+	"payload": ["BRUN ARMORIA"]
+    },
+    "BRUN FANTASY MAPS" : {
+	"action": "redirect",
+	"type": "B",
+	"sectors": 22,
+	"payload": ["https://www.dungeoneer.com/dungeoneer/maps/"]
+    },
+    "RUN FANTASY MAPS" : {
+	"action": "alias",
+	"payload": ["BRUN FANTASY MAPS"]
     },
     "RUN BASEBALL" : {
 	"action": "redirect",
@@ -281,20 +387,6 @@
     "PR#6" : {
 	"action": "alias",
 	"payload": ["BRUN PRODOS"]
-    },
-    "BRUN CASTLE WOLFENSTEIN" : {
-	"action": "boot",
-	"type": "B",
-	"sectors": 120,
-	"payload": ["assets/disks/castle-wolfenstein.dsk"]
-    },
-    "RUN CASTLE WOLFENSTEIN" : {
-	"action": "alias",
-	"payload": ["BRUN CASTLE WOLFENSTEIN"]
-    },
-    "BRUN WOLFENSTEIN" : {
-	"action": "alias",
-	"payload": ["BRUN CASTLE WOLFENSTEIN"]
     },
     "BRUN KARATEKA" : {
 	"action": "boot",

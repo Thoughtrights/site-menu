@@ -75,6 +75,7 @@ let working = false;      // the program is waiting on the network
 
 // Timers that belong to the running machine. Power off cancels them all.
 let output = null;        // the listing being printed, if any
+let resumeOutput = null;  // a CATALOG stopped at a full screen: call to go on
 let redirectTimer = null;
 let powerOffTimer = null;
 let floppyTimer = null;
@@ -413,6 +414,11 @@ function setUpPhone() {
 	    phoneInput.value = ' ';
 	    return;
 	}
+	if (resumeOutput && on) {
+	    phoneInput.value = ''; // any key shows the next screen of CATALOG
+	    resumeOutput();
+	    return;
+	}
 	if (!acceptingInput()) {
 	    phoneInput.value = ''; // the machine is off or busy
 	    return;
@@ -435,7 +441,9 @@ function setUpPhone() {
 	    return;
 	}
 	phoneInput.value = '';
-	if (acceptingInput()) {
+	if (resumeOutput && on) {
+	    resumeOutput();
+	} else if (acceptingInput()) {
 	    processCommand(lines[line]);
 	    render();
 	}
@@ -763,6 +771,15 @@ document.addEventListener('keydown', (event) => {
 	return; // typing goes into the phone's text field; see setUpPhone()
     }
 
+    if (resumeOutput && on) {
+	// A full screen of CATALOG: any key shows the next one.
+	if (!['Shift', 'Control', 'CapsLock'].includes(event.key)) {
+	    event.preventDefault();
+	    resumeOutput();
+	}
+	return;
+    }
+
     const isPrintable =
 	  (keycode > 47 && keycode < 58) || // number keys
 	  keycode == SPACEBAR ||
@@ -807,7 +824,7 @@ function pushRedirect(url) {
 }
 
 function acceptingInput() {
-    return on && !booting && !output && !working;
+    return on && !booting && !output && !resumeOutput && !working;
 }
 
 function controlC() {
@@ -815,7 +832,7 @@ function controlC() {
     if (booting) {
 	return;
     }
-    if (output || program) {
+    if (output || resumeOutput || program) {
 	cancelOutput();
 	endProgram();
     } else if (redirectTimer) {
@@ -933,7 +950,7 @@ function bootDisk(disk) {
      * there is an I/O ERROR. */
     endProgram();
     const token = programToken;
-    const url = new URL(disk, location.href).href;
+    const url = new URL(disk, document.baseURI).href; // under /menu/ even at /
     working = true;
     readFromFloppy(60);
     fetch(url, { method: 'HEAD' }).then((response) => {
@@ -1039,7 +1056,8 @@ function processCommand(command) {
 	    showArrayData(commands[resolved]["payload"]);
 	}
 	if (action == "catalog") {
-	    showArrayData(catalogListing(commands[resolved]["volume"] || 254));
+	    // A screenful at a time, with "]CATALOG" still at the top.
+	    showArrayData(catalogListing(commands[resolved]["volume"] || 254), MAX_ROWS);
 	}
 	if (action == "program") {
 	    const [name, ...args] = commands[resolved]["payload"];
@@ -1115,11 +1133,15 @@ function animateKey(keyCode) {
 }
 
 const terminal = document.querySelector('.monitor__terminal');
+
+function screenRows(text) {
+    // Long lines wrap onto the next screen row.
+    return Math.max(1, Math.ceil(text.length / columns));
+}
+
 function render() {
 
-    // Long lines wrap onto the next screen row; drop whole lines off
-    // the top until the screen rows fit.
-    const screenRows = (text) => Math.max(1, Math.ceil(text.length / columns));
+    // Drop whole lines off the top until the screen rows fit.
     let rows = lines.reduce((total, text) => total + screenRows(text), 0);
     while (rows > MAX_ROWS + 1 && lines.length > 1) {
 	rows -= screenRows(lines.shift());
@@ -1199,19 +1221,24 @@ function cancelOutput() {
 	clearInterval(output);
 	output = null;
     }
+    resumeOutput = null;
 }
 
 function showData(inputData) {
     return showArrayData(inputData.split('\n'));
 }
 
-function showArrayData(dataLines) {
+function showArrayData(dataLines, pageRows = 0) {
+    /* Print lines one at a time, then the prompt. With pageRows, stop
+     * after that many screen rows until a key is pressed, as DOS 3.3's
+     * CATALOG did: no message, just no prompt yet. */
     const tmpDataLines = dataLines.map(toScreenText); // copy JSON array values not just a new reference
+    let rowsShown = 0;
 
     cancelOutput();
     readFromFloppy(5); // light up the floppy drive
     return new Promise((resolve) => {
-	output = setInterval(() => {
+	const printNext = () => {
 	    if (!tmpDataLines.length) {
 		cancelOutput();
 		lines.push(promptText);
@@ -1220,9 +1247,23 @@ function showArrayData(dataLines) {
 		resolve();
 		return;
 	    }
-	    lines.push(tmpDataLines.shift());
+	    if (pageRows && rowsShown + screenRows(tmpDataLines[0]) > pageRows) {
+		cancelOutput();
+		stopFloppy();
+		resumeOutput = () => {
+		    resumeOutput = null;
+		    rowsShown = 0;
+		    readFromFloppy(5);
+		    output = setInterval(printNext, OUTPUT_SPEED);
+		};
+		return;
+	    }
+	    const text = tmpDataLines.shift();
+	    rowsShown += screenRows(text);
+	    lines.push(text);
 	    line++;
 	    render();
-	}, OUTPUT_SPEED);
+	};
+	output = setInterval(printNext, OUTPUT_SPEED);
     });
 }

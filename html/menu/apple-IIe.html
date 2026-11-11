@@ -2,6 +2,10 @@
 <html lang="en" >
 <head>
   <meta charset="UTF-8">
+  <!-- Every other URL in this page and its scripts is relative to this
+       base, so the page also works as the site's front page, at /.
+       deploy/deploy.sh uat rewrites it to /menu-uat/. -->
+  <base href="/menu/">
   <link rel="stylesheet" href="css/apple-IIe.css">
   <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Audiowide&amp;display=swap'>
 
@@ -129,6 +133,12 @@
   <div class="key__side key__side--back"></div>
   <div class="key__side key__side--front"></div>
 </div>
+<!-- One quiet line under the desk. The plain menu has every link as
+     ordinary HTML, for search engines, screen readers and anyone in a hurry. -->
+<footer class="front-door">
+  thoughtrights.com &middot; founded April 30 1995 &middot;
+  <a href="index.html">plain menu</a>
+</footer>
 <script  src="js/jszm.js"></script>
 <script  src="js/apple-IIe-programs.js"></script>
 <script  src="js/apple-IIe.js"></script>

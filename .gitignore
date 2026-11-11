@@ -1,6 +1,9 @@
 __pycache__/
 
-# Commercial disks: fine to keep a copy here, never to commit one.
+# Commercial disks: fine to keep a copy here, and deploy/deploy.sh sends it
+# to the server, but never commit one (the repository is public).
 # Listed in DISKS_NOT_SHIPPED in tests/test_site.py.
-html/menu/assets/disks/castle-wolfenstein.dsk
 html/menu/assets/disks/karateka.dsk
+
+# Written by deploy/deploy.sh at each deploy.
+html/menu/version.json

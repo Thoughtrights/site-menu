@@ -3,8 +3,9 @@
 
     python3 tools/dev-server.py [port]     (default 8765)
 
-Then open http://localhost:8765/menu/apple-IIe.html, or from a phone on
-the same network, http://<this machine's address>:8765/menu/apple-IIe.html.
+Then open http://localhost:8765/ (the Apple, as the front page) or
+http://localhost:8765/menu/apple-IIe.html, or from a phone on the same
+network, http://<this machine's address>:8765/.
 The gopher proxy is told to accept whichever of these the page came
 from and keeps its cache in /tmp.
 """
@@ -22,6 +23,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
+
+    def translate_path(self, path):
+        # The Apple is the front door, as Apache's DirectoryIndex makes it
+        # on the server (INSTALLATION.md). /index.html is still the old page.
+        if path.split('?')[0] == '/':
+            return os.path.join(ROOT, 'menu', 'apple-IIe.html')
+        return super().translate_path(path)
 
     def end_headers(self):
         # Always revalidate, so a reload picks up edited JS and CSS.

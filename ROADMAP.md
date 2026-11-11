@@ -3,8 +3,97 @@
 What's left to do. The guiding rule: it should feel like a special thing you
 discover. Nobody tells you how to use it. `HELP` is the only concession.
 
-Finished work is in the git history, and [INSTALLATION.md](INSTALLATION.md)
-covers running and deploying what exists.
+Finished work is in the git history, [INSTALLATION.md](INSTALLATION.md) covers
+running and deploying what exists, and [CI-CD-PLAN.md](CI-CD-PLAN.md) is the
+plan for deploying automatically.
+
+## Direction: a BBS and a gopher hole
+
+Both stay. They suit different things:
+
+- **The BBS** is where the site's own content goes. A BBS can lay a screen
+  out any way it likes: menus, doors, file areas, bulletins, a sysop. It is
+  archaic and flexible, but isolated: nothing outside it links in or out.
+- **The gopher hole** (`gopher://thoughtrights.com/`) connects. It's part of
+  the gopherspace other servers still run, so it can link to them and they to
+  it. Putting interfaces in a gopher hole (searches, small applications) is
+  archaic enough to fit right in.
+
+The Apple reaches both: the BBS by dialling in with the modem, and gopher
+through `BRUN GOPHER` today and, later, as one of the BBS's doors.
+
+## The front door (design A)
+
+The Apple is the front page: `CATALOG` lists every project as a file on the
+disk, a screenful at a time, and one quiet line under the desk links the plain
+menu. Built; what's left:
+
+- [ ] Turn it on for the live site: one `DirectoryIndex` line in Apache, in
+      "The Apple as the front page" in INSTALLATION.md. Needs your go-ahead.
+- [ ] Add `gopher://thoughtrights.com` to the line under the desk once the
+      gopher server is live. (Browsers don't open gopher links themselves, so
+      it's there to be seen and copied.)
+- [ ] Not on the disk yet, on purpose: the D&DBeyond integration (abandoned),
+      and projects that are only a GitHub repository (Characteristics, the
+      live-streaming subtitles). Add them if they should be.
+- [ ] Mockups for the next steps are in the proposals from 2026-11-11: design
+      B (a disk box, one floppy per section) is "Managing the disks" below,
+      and design D (dial in, land on the gopher hole) needs the modem.
+      Design C (a menu program with a key line) breaks the discovery rule
+      and isn't planned as the front door.
+
+## Projects on the Apple
+
+Four projects need very different amounts of work to come into the Apple
+rather than just being redirected to. Heaviest first:
+
+### Baseball cards: heavy, and first
+
+`RUN BASEBALL` only opens the web page. A browser inside the Apple, from the
+mockups: a list (set, number, player, team, value; type a name to find it;
+filter by team or set; sort by value) and a card screen with the scan dithered
+into green dots and "also in the box" counts.
+
+- [ ] The list. Text only, so it needs only the first groundwork step (a
+      program that owns the screen and the keys).
+- [ ] The card picture. Needs the graphics layer, and finding each card's
+      edges in the scan, which includes the desk around it.
+- [ ] Decide: show the key line at the bottom (period programs did), and show
+      dollar values and the collection's total (already public on the web
+      page)?
+- Data: `/baseball-cards/baseballCards.json`, same origin as the Apple, so no
+  proxy. The proposals count 508 cards from 1952 to 1955; the mockup's header
+  says 1953–1955 and needs correcting. Not rechecked here.
+
+### Barzy: heavy, but later
+
+An audio/video sync test: the mascot bounces, beeping at each edge, so an
+engineer can see whether sound and picture land together.
+
+- [ ] Needs all of the groundwork: the screen and keys, the graphics layer,
+      and Web Audio, with the beep and the edge flash on the same frame.
+- [ ] The mascot doesn't read once dithered in the mockup. Try again (a
+      bigger figure, fewer tones) before building.
+- [ ] Decide whether to keep the bounce counter, which Barzy's web page
+      doesn't have.
+
+### Resume: light, mostly writing
+
+- [ ] Write `RESUME.TXT`: the resume as wrapped plain text. It only exists as
+      a web page, PDF and DOCX today. Yours to write.
+- [ ] `OPEN RESUME` prints it instead of redirecting, with the web page and
+      PDFs still a command away.
+- [ ] Later, in the BBS's file area: "downloading" the PDF runs a fake XMODEM
+      transfer, then the browser really downloads it.
+
+### Dungeoneer: light on the Apple
+
+DUNGEONEER.com is its own site, so on the Apple it stays a link plus doors:
+
+- [ ] The generators as programs or BBS doors, asking their questions at the
+      prompt. See "Discord-style tools" below.
+- [ ] Armoria, the fantasy maps and the gaming interstitials stay links:
+      they're graphical.
 
 ## Bugs
 
@@ -17,8 +106,9 @@ covers running and deploying what exists.
       stopped there. Perhaps a long press on the screen.
 - [ ] Check on real devices: iPhone Safari, Android Chrome with Gboard (which
       composes whole words before sending them), an iPad with and without a
-      keyboard attached. This includes typing into the //e, which has only
-      been tested in an emulated phone viewport.
+      keyboard attached. This includes typing into the //e, and going on with
+      a paused `CATALOG`, both only tested in an emulated phone viewport or
+      not at all.
 - [ ] The text is small on a phone held upright (about 10px): 40 columns at
       that width is the limit.
 
@@ -45,11 +135,13 @@ real one holds 560. Some entries aren't really disks at all.
 - [ ] Decide what each entry is:
   - **A file** on the menu's disk (`RESUME`, `JOBPOST`).
   - **A disk** you insert and boot (`EAMON`, `PRODOS`, `ZORK`).
-  - **A place you connect to**, like a BBS (`GOPHER`, `SEARCH`, the character
-    tools, Alpha Complex). These need a server or the network, and would feel
-    right reached through the modem instead of `BRUN`.
-- [ ] A disk box: one data file listing every disk with its title, image file,
-      format, source and licence, so what we may share is recorded next to it.
+  - **A place you connect to** (`GOPHER`, `SEARCH`, the character tools,
+    Alpha Complex). These belong on the BBS or the gopher hole, reached
+    through the modem instead of `BRUN`.
+- [ ] A disk box (design B): one data file listing every disk with its title,
+      image file, format, source and licence, so what we may share is
+      recorded next to it. In the mockup the box rests on the Disk II;
+      floppies must never hang in the air.
 - [ ] Inserting disks: click the Disk II drive to choose one, with the door and
       the IN USE light responding. A second drive for `CATALOG,D2` and
       two-disk programs.
@@ -57,18 +149,37 @@ real one holds 560. Some entries aren't really disks at all.
 - [ ] More Eamon adventures in drive 2 (`#master|adventure`).
 - [ ] Image the Apple II floppies at home and add the Eamon adventures written
       on them. See the tools listed under "Getting disks" in INSTALLATION.md.
-- [ ] Decide on `BRUN CASTLE WOLFENSTEIN`: it is wired up, but it prints
-      `I/O ERROR` until a `.dsk` is at
-      `assets/disks/castle-wolfenstein.dsk`. Its owner is unknown, so nobody
-      can grant permission to host it. Either add a disk or remove the entry.
 - [ ] The ProDOS 2.4.3 disk also carries third-party utilities, including Copy
       II Plus 8.4, a commercial program. Consider a disk with just ProDOS and
       BASIC.SYSTEM.
 
-## Dial-up modem and BBSes
+## The gopher hole
+
+`gopher/` holds the site index as a gopher menu and a search, served by
+Gophernicus (INSTALLATION.md section 3). Tested locally, not deployed.
+
+- [ ] Deploy it, twice: prod on port 70 and UAT on port 7070, each a
+      Gophernicus serving its build's `gopher/` (CI-CD-PLAN.md). Needs your
+      go-ahead.
+- [ ] Let `BRUN GOPHER` reach and list each environment's own hole: the
+      proxy only talks to port 70 today.
+- [ ] `BRUN GOPHER`: choosing a web link (type `h`) prints `FILE TYPE
+      MISMATCH`. It should show the address and offer to open it (`http` and
+      `https` only). The remote program protocol needs a way to ask the page
+      to open a URL.
+- [ ] Check whether the gophermap's `!` title line prints twice through the
+      proxy, as the proposals report. Needs Gophernicus running.
+- [ ] Add our own hole to `BRUN GOPHER`'s home menu once it's live.
+- [ ] More interfaces in the hole, as gopher applications: the weather
+      forecast as text, the baseball cards as a searchable list, the
+      generators as type 7 searches.
+- [ ] Link out to other gopher holes worth visiting, so ours is part of
+      gopherspace rather than a dead end.
+
+## Dial-up modem and the BBS
 
 Simulate a Hayes-compatible modem on a serial card in slot 2. This is how you
-reach the "place you connect to" entries above.
+reach the BBS and the other "places you connect to".
 
 - [ ] `PR#2` / `IN#2` to talk to it, then `AT` commands: `ATZ`,
       `ATDT 555-1212`, `ATH`, `+++`.
@@ -80,13 +191,47 @@ reach the "place you connect to" entries above.
 - [ ] A phone book of numbers in a data file. Each number is a BBS or service.
       Nobody gives you the numbers: they turn up in files on the disk, in the
       job post, on a BBS.
-- [ ] A BBS shell for those services: a login banner, a main menu, a sysop,
-      and things left behind by earlier callers. Gopher, search and the
-      character tools become its doors.
+- [ ] `RUN WARDIAL`: scans the 555 exchange and reports which numbers answer.
+      It's how visitors find the one-offs (WOPR, say) without being told.
 - [ ] Reaching the modem from inside the //e: a simulated serial card in
       apple2js, so a BASIC program can dial out too.
 - [ ] Maybe real telnet BBSes that still run. That needs a long-lived
       connection, which the stateless CGI proxy can't hold.
+
+### The Thoughtrights BBS
+
+A main menu after the login banner and the new-caller agreement (the site's
+copyright notice, which already mentions bulletin boards):
+
+```
+THOUGHTRIGHTS BBS    EST. 1995    NODE 1
+
+ [F] FILE AREA        [D] DOORS
+ [B] BULLETINS        [W] WEATHER
+ [P] POETRY CORNER    [C] TRAFFIC CAMS
+ [O] ONE-LINERS       [G] GOODBYE
+
+45 MINUTES LEFT.  COMMAND?
+```
+
+- [ ] The shell: login banner (Daemous's skull as hi-res art), menus,
+      time left, a sysop.
+- [ ] **File area:** each project's README as plain text, `RESUME.TXT`, the
+      Selfeyes essay.
+- [ ] **Bulletins** from the git history (a phlog on the gopher side).
+- [ ] **Doors:** the generators, gopher, search, Zork.
+- [ ] **Weather:** the forecast from `/weather/weather.api` as text, and its
+      MP3 announcer.
+- [ ] **Traffic cams:** browse `/cam/config.json` by borough or street.
+      Whether the city's camera server lets a page read its images wasn't
+      checked; drawing a frame may need a proxy.
+- [ ] **Poetry corner:** the spoken-word pieces as a tape deck. Their texts
+      are needed; they only exist as audio.
+- [ ] `FINGER WIZ` prints a `.plan` of current projects.
+- [ ] The 1995 job post (`OPEN JOBPOST`) in a `tin`-style newsreader.
+- [ ] One-liners: visitors' writing, so it needs moderation. Left out unless
+      that's worth it.
+- Suggested order: WOPR (no new content), weather, then the baseball door.
 
 ## Emulated programs
 
@@ -186,6 +331,11 @@ Decided against, so nobody has to research these again:
 
 ## Making it feel special
 
+- [ ] A backdrop to replace the grey gradient. Rejected: desk-and-wall rooms.
+      Proposed, no decision: Studio sweep (warm off-white, close to today),
+      Phosphor (near-black with a green glow, like the rest of the site), and
+      Sage (muted green). The CSS for each is in the proposals'
+      `mockup-scripts/backdrops.json`.
 - [ ] Sounds: the power-on beep, drive whir and clunk while the IN USE light is
       on, the bell (Ctrl-G) on errors, key clicks.
 - [ ] Boot in 40 columns and switch to 80 with `PR#3`.
@@ -195,36 +345,37 @@ Decided against, so nobody has to research these again:
 
 ## Groundwork
 
-The code grew from a 3D model into a UI. Before the bigger features:
+The code grew from a 3D model into a UI. Before the bigger features (the
+baseball browser and Barzy need the first three):
 
+- [ ] A "current program" that owns the screen and the keys, for highlight
+      bars and arrow keys: the DOS prompt, the modem, the BBS, the browser, a
+      game. Each one exits back to the one before.
+- [ ] A graphics layer: a 560x192 canvas over the text screen lines up with
+      the 80x24 characters exactly (7x8 dots each); one Apple hi-res dot is
+      two canvas pixels wide. Mixed mode is 160 rows of graphics over four
+      rows of text.
+- [ ] Sound with Web Audio: Barzy's beep, the modem, the drive.
 - [ ] One input function that every source (physical keys, on-screen keys,
       phone field) feeds into.
-- [ ] A "current program" that owns input and output: the DOS prompt, the
-      modem, a BBS, the browser, a game. Each one exits back to the one before.
 - [ ] One output queue with a speed setting (normal, 300 baud, 1200 baud) and
-      cancellation.
+      cancellation. `CATALOG`'s pause would move into it.
 - [ ] Remove the stray `html/menu/assets/command-data.json~` from the repository.
 
 ## Deployment (CI/CD)
 
-Pull requests are checked by GitHub Actions (`.github/workflows/checks.yml`),
-but deploys are by hand, and the live site doesn't have the programs, the gopher
-proxy, Zork or the //e yet. A path from merge to the live site, with no fees
-beyond the EC2 hosting:
+Pull requests are checked by GitHub Actions (`.github/workflows/checks.yml`);
+deploys are by hand, and the live site has none of this year's work. The plan
+is in [CI-CD-PLAN.md](CI-CD-PLAN.md): deploy from your machine with
+`./deploy/deploy.sh uat|prod`, like the character app, rsyncing to a build
+directory on the EC2 host that Apache serves at `/menu-uat/` or `/menu/`,
+each with its own gopher hole (ports 7070 and 70). Uncommitted changes may
+go to prod, stamped `-dirty`.
 
-- [ ] **Deploy on merge to `master`:** rsync `html/menu/` to the server, keeping
-      the execute bit on `gopher.cgi` and skipping editor backups.
-- [ ] **Decide how it reaches the server.** Either:
-  - GitHub Actions connects over SSH with a deploy-only key, stored as a GitHub
-    secret, whose user can only write to the menu's directory. GitHub's runners
-    use wide address ranges, so this may mean opening SSH more than you'd like.
-  - Or the server pulls: a systemd timer on the EC2 instance fetches `master`
-    and rsyncs. No inbound access and no secrets at GitHub, but the deploy
-    isn't reported back to the pull request.
-- [ ] **First-time server setup** by hand, once: Apache's CGI settings and the
-      cache directory from INSTALLATION.md. Needs your go-ahead, since it
-      touches the production server.
-- [ ] **Smoke test after each deploy:** the page loads, and a POST to the proxy
-      returns the gopher menu.
-- [ ] **Rollback:** keep the last few releases in dated directories behind a
-      symlink, so going back is one command.
+- [ ] Write `deploy/deploy.sh`, with its README and a test that runs it
+      against a temporary directory.
+- [ ] First-time server setup, by hand, once: the two `Alias` blocks, the
+      proxy's cache directories and the two gopher holes. Needs your
+      go-ahead.
+- [ ] Require the checks to pass before merging to `master`.
+- [ ] A browser smoke test in CI.

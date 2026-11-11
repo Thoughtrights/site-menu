@@ -15,10 +15,9 @@ MENU = os.path.join(HERE, '..', 'html', 'menu')
 MAX_ALIAS_HOPS = 5  # resolveCommand in js/apple-IIe.js gives up after this
 
 # Catalog entries whose disk stays out of the repository, which is public:
-# commercial games nobody can give us permission to share. A copy may sit in
-# your working tree for testing or deploying; .gitignore keeps it out of git.
-DISKS_NOT_SHIPPED = {'assets/disks/castle-wolfenstein.dsk',
-                     'assets/disks/karateka.dsk'}
+# commercial games we have no permission to share. A copy may sit in your
+# working tree for testing or deploying; .gitignore keeps it out of git.
+DISKS_NOT_SHIPPED = {'assets/disks/karateka.dsk'}
 ACTIONS = {'print', 'redirect', 'catalog', 'program', 'boot', 'alias', 'reserved'}
 
 
@@ -112,11 +111,25 @@ class CommandDataTest(unittest.TestCase):
 
 class FilesTest(unittest.TestCase):
 
+    # The page is the front page at / too, so its URLs hang off this base,
+    # which deploy/deploy.sh rewrites for uat.
+    BASE = '<base href="/menu/">'
+
     def test_page_references_exist(self):
-        page = read('apple-IIe.html')
+        page = read('apple-IIe.html').replace(self.BASE, '')
         for path in re.findall(r'(?:src|href)="([^"#]+)"', page):
             if not re.match(r'[a-z]+:|//', path):
                 self.assertTrue(exists(path), path)
+
+    def test_only_the_base_names_the_mount(self):
+        # Prod is /menu/, uat /menu-uat/. Everything but the base is
+        # relative, so rewriting that one line moves the whole page.
+        page = read('apple-IIe.html')
+        self.assertEqual(page.count(self.BASE), 1)
+        page = page.replace(self.BASE, '')
+        self.assertEqual(re.findall(r'(?:src|href)="(/(?!/)[^"]*)"', page), [])
+        for name in ('apple-IIe.js', 'apple-IIe-programs.js'):
+            self.assertNotRegex(read('js', name), r"""['"]/menu/""", name)
 
     def test_emulator_files_exist(self):
         for path in ('LICENSE', 'apple2jse.html', 'css/apple2.css', 'json/disks/index.js',

@@ -1029,6 +1029,31 @@ body.zoomed .zoom-toggle .zoom-toggle__out {
 }
 
 /* A brief note, in the same plastic as the zoom toggle. */
+/* The line under the desk. Out of the way when zoomed in; the phone's
+ * full-screen terminal covers it once the computer is on. */
+.front-door {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  z-index: 800;
+  text-align: center;
+  color: #57534a;
+  font: 14px/1.4 "Courier New", Courier, monospace;
+  pointer-events: none;
+}
+.front-door a {
+  color: inherit;
+  pointer-events: auto;
+}
+.front-door a:hover,
+.front-door a:focus-visible {
+  color: #1f1d18;
+}
+body.zoomed .front-door {
+  display: none;
+}
+
 .toast {
   position: fixed;
   left: 50%;
