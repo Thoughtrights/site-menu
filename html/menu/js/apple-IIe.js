@@ -27,7 +27,7 @@ const MAX_SEQUENTIAL_SYNTAX_ERRORS = 3;
 const POWER_BUTTON_ALERT_SECONDS_START = 5; // start alerting the user after seconds if they haven't hit the power button
 const POWER_BUTTON_ALERT_SECONDS_STOP = 120; // just stop any alert if they haven't clicked
 const DOS_FILE_VERBS = ['RUN', 'BRUN', 'OPEN', 'LOAD', 'BLOAD', 'EXEC', 'READ'];
-const DESK_PARTS = '.monitor, .keyboard, .keyboard *, .floppy-drive, .floppy-drive *';
+const DESK_PARTS = '.monitor, .keyboard, .keyboard *, .floppy-drive, .floppy-drive *, .speaker, .speaker *';
 const ZOOM_SECONDS = 1.4;
 const FLICKER_WARM_UP_SECONDS = 60; // then the screen only flickers now and then:
 const FLICKER_EVERY_SECONDS = 60;    // a flicker every 60 seconds...
@@ -201,6 +201,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }, (1000 * POWER_BUTTON_ALERT_SECONDS_START));
 
     powerSwitch.addEventListener('click', togglePower);
+
+    // The button on the left speaker: all sound on or off.
+    soundToggle = document.querySelector('.speaker__button');
+    soundToggle.addEventListener('click', (event) => {
+	event.stopPropagation();
+	setSound(!soundOn);
+	soundToggle.blur(); // so the space bar and RETURN keep typing
+    });
+    setSound(soundOn);
 
     if (touchMode) {
 	setUpPhone();
@@ -974,6 +983,24 @@ function makeMachine(token) {
 		    playSound(sound, volume);
 		}
 	    },
+	    // Each resolves when it has finished (at once if the program's over).
+	    tone: (frequencies, seconds, volume = 0.08) =>
+		alive() ? playTones(frequencies, seconds, volume) : Promise.resolve(),
+	    noise: (seconds, volume = 0.05) => alive() ? playNoise(seconds, volume) : Promise.resolve(),
+	    say: (text) => alive() ? say(text) : Promise.resolve(),
+	    pause: (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000)),
+	},
+	wait(promise) {
+	    // Input off until the promise settles, without the disk drive light.
+	    if (!alive()) {
+		return promise;
+	    }
+	    working = true;
+	    return promise.finally(() => {
+		if (alive()) {
+		    working = false;
+		}
+	    });
 	},
 	running: () => alive(), // false once the program is broken off: stop animating
 	work(promise) {
@@ -1004,6 +1031,7 @@ function endProgram() {
     programToken++;
     program = null;
     clearGraphics();
+    stopSounds();
     if (working) {
 	stopFloppy(); // broken off while it waited on the network
     }
@@ -1055,7 +1083,8 @@ function bootDisk(disk) {
 	emulator = document.createElement('iframe');
 	emulator.className = 'monitor__emulator';
 	emulator.title = 'Apple //e';
-	emulator.src = 'apple2js/apple2jse.html?mono_screen=true&gl_canvas=false#' + url;
+	emulator.src = 'apple2js/apple2jse.html?mono_screen=true&gl_canvas=false' +
+	    (soundOn ? '' : '&muted') + '#' + url;
 	if (!touchMode) {
 	    // On a phone the keys come from the phone keyboard instead.
 	    emulator.addEventListener('load', () => emulator && emulator.focus());
@@ -1451,13 +1480,55 @@ async function loadBitmap(url, width, height) {
 let audio = null;
 
 function audioContext() {
+    // Every sound goes through audio.master, which the sound button turns
+    // to 0: silent, but each sound still takes its time, as the modem needs.
     if (!audio) {
 	audio = new (window.AudioContext || window.webkitAudioContext)();
+	audio.master = audio.createGain();
+	audio.master.gain.value = soundOn ? 1 : 0;
+	audio.master.connect(audio.destination);
     }
     if (audio.state === 'suspended') {
 	audio.resume();
     }
     return audio;
+}
+
+/* The sound button: everything the Apple plays, on or off, remembered in
+ * this browser. */
+const SOUND_PREFERENCE = 'apple-IIe-sound';
+let soundOn = readSoundPreference();
+let soundToggle = null;
+
+function readSoundPreference() {
+    try {
+	return window.localStorage.getItem(SOUND_PREFERENCE) !== 'off';
+    } catch (error) {
+	return true; // no storage (a private window, say): sound on
+    }
+}
+
+function setSound(on) {
+    soundOn = on;
+    try {
+	window.localStorage.setItem(SOUND_PREFERENCE, on ? 'on' : 'off');
+    } catch (error) {
+	// not remembered, which is fine
+    }
+    document.body.classList.toggle('sound-off', !on);
+    if (soundToggle) {
+	soundToggle.setAttribute('aria-pressed', String(on));
+	soundToggle.title = on ? 'Sound is on' : 'Sound is off';
+    }
+    if (audio) {
+	audio.master.gain.setValueAtTime(on ? 1 : 0, audio.currentTime);
+    }
+    if (!on && window.speechSynthesis) {
+	window.speechSynthesis.cancel();
+    }
+    if (emulator && emulator.contentWindow && emulator.contentWindow.menuSetMuted) {
+	emulator.contentWindow.menuSetMuted(!on); // the //e, too
+    }
 }
 
 async function loadSound(url) {
@@ -1478,8 +1549,93 @@ function playSound(sound, volume) {
     const gain = context.createGain();
     gain.gain.value = volume;
     source.buffer = sound;
-    source.connect(gain).connect(context.destination);
+    source.connect(gain).connect(context.master);
     source.start();
+}
+
+// Sounds made on the spot (tones, noise), so a program that ends can stop them.
+const soundsPlaying = new Set();
+
+function playTones(frequencies, seconds, volume) {
+    /* Sine tones mixed together for `seconds`: a dial tone (350 + 440 Hz),
+     * a touch-tone digit, a ring, a modem answering. Resolves when done. */
+    const context = audioContext();
+    const gain = context.createGain();
+    const now = context.currentTime;
+    const level = volume / Math.max(1, frequencies.length);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(level, now + 0.01); // no clicks
+    gain.gain.setValueAtTime(level, now + Math.max(0.01, seconds - 0.01));
+    gain.gain.linearRampToValueAtTime(0, now + seconds);
+    gain.connect(context.master);
+    return Promise.all(frequencies.map((frequency) => new Promise((resolve) => {
+	const oscillator = context.createOscillator();
+	oscillator.frequency.value = frequency;
+	oscillator.connect(gain);
+	oscillator.onended = () => {
+	    soundsPlaying.delete(oscillator);
+	    resolve();
+	};
+	soundsPlaying.add(oscillator);
+	oscillator.start(now);
+	oscillator.stop(now + seconds);
+    })));
+}
+
+function playNoise(seconds, volume) {
+    // Hiss, for the screech of two modems agreeing on a speed.
+    const context = audioContext();
+    const length = Math.max(1, Math.floor(context.sampleRate * seconds));
+    const buffer = context.createBuffer(1, length, context.sampleRate);
+    const samples = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+	samples[i] = Math.random() * 2 - 1;
+    }
+    const source = context.createBufferSource();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1800;
+    gain.gain.value = volume;
+    source.buffer = buffer;
+    source.connect(filter).connect(gain).connect(context.master);
+    return new Promise((resolve) => {
+	source.onended = () => {
+	    soundsPlaying.delete(source);
+	    resolve();
+	};
+	soundsPlaying.add(source);
+	source.start();
+    });
+}
+
+function say(text) {
+    // A voice on the line, with the browser's own speech. Resolves when it
+    // has finished, or straight away where there's no speech.
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+	return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+	const utterance = new SpeechSynthesisUtterance(text);
+	utterance.rate = 0.95;
+	utterance.onend = utterance.onerror = () => resolve();
+	window.speechSynthesis.speak(utterance);
+	setTimeout(resolve, 1500 + text.length * 120); // in case it never says it's done
+    });
+}
+
+function stopSounds() {
+    for (const sound of soundsPlaying) {
+	try {
+	    sound.stop();
+	} catch (error) {
+	    // already stopped
+	}
+    }
+    soundsPlaying.clear();
+    if (window.speechSynthesis) {
+	window.speechSynthesis.cancel();
+    }
 }
 
 function readFromFloppy(seconds) {

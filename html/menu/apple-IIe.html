@@ -40,6 +40,34 @@
 <div class="bg"></div>
 <h1 class="h1-bg">Apple <span>IIe</span></h1>
 <div class="🖥️">
+  <!-- A pair of desk speakers, one on each side. They come first so the
+       computer and the drive are drawn over them: the scene paints in page
+       order, not by depth. Their diodes are green while sound is on and red
+       while it's off; the button on the left one switches it (setSound in
+       js/apple-IIe.js). -->
+  <div class="speaker speaker--left">
+    <div class="speaker__top"></div>
+    <div class="speaker__side"></div>
+    <div class="speaker__front">
+      <div class="speaker__grille"></div>
+      <div class="speaker__controls">
+        <button class="speaker__button" type="button" aria-label="Sound" aria-pressed="true"></button>
+        <div class="speaker__diode"></div>
+      </div>
+    </div>
+    <div class="speaker__bottom"></div>
+  </div>
+  <div class="speaker speaker--right">
+    <div class="speaker__top"></div>
+    <div class="speaker__side"></div>
+    <div class="speaker__front">
+      <div class="speaker__grille"></div>
+      <div class="speaker__controls">
+        <div class="speaker__diode"></div>
+      </div>
+    </div>
+    <div class="speaker__bottom"></div>
+  </div>
   <div class="back-shadow"></div>
   <div class="monitor-shadow"></div>
   <div class="monitor">

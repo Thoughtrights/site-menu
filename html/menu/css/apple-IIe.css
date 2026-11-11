@@ -686,6 +686,115 @@ body {
   box-shadow: 0 0 2vmin 1vmin rgba(0, 0, 0, 0.22);
 }
 
+/* A pair of small desk speakers, one each side of the monitor, built like
+ * the drive: a box of faces in 3D. The diodes are green while sound is on,
+ * red while it's off (body.sound-off); the left one has the button. */
+.speaker {
+  position: absolute;
+  top: 52vmin;
+  transform-style: preserve-3d;
+  transform: translateZ(var(--z));
+  --width: 11vmin;
+  --height: 21vmin;
+  --depth: 11vmin;
+  --z: -12vmin;
+  width: var(--width);
+  height: var(--height);
+}
+.speaker--left {
+  left: 6vmin;
+}
+.speaker--right {
+  left: 103vmin; /* about a quarter of it behind the drive */
+}
+.speaker__front {
+  position: absolute;
+  transform: translateZ(calc(var(--depth) / 2));
+  width: var(--width);
+  height: var(--height);
+  box-sizing: border-box;
+  padding: 1.2vmin 1.2vmin 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0.6vmin;
+  background: linear-gradient(to bottom, #efebdc, #ddd7c4);
+  box-shadow: inset 0 0 0.6vmin rgba(0, 0, 0, 0.18);
+}
+.speaker__grille {
+  flex: 1;
+  border-radius: 0.45vmin;
+  background:
+    radial-gradient(circle, #2f2a24 0.16vmin, transparent 0.19vmin) 0 0 / 0.55vmin 0.55vmin,
+    #7d7666;
+  box-shadow: inset 0 0 1.2vmin rgba(0, 0, 0, 0.55);
+}
+.speaker__controls {
+  height: 2.6vmin;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1vmin;
+}
+.speaker__diode {
+  width: 0.8vmin;
+  height: 0.8vmin;
+  border-radius: 50%;
+  background-color: #3dff6e;
+  box-shadow: 0 0 0.5vmin 0.15vmin rgba(61, 255, 110, 0.75);
+}
+body.sound-off .speaker__diode {
+  background-color: #ff3b2f;
+  box-shadow: 0 0 0.5vmin 0.15vmin rgba(255, 59, 47, 0.75);
+}
+.speaker__button {
+  width: 1.8vmin;
+  height: 1.1vmin;
+  padding: 0;
+  border: 0.1vmin solid #9c978a;
+  border-top-color: #f7f4ea;
+  border-radius: 0.25vmin;
+  background: linear-gradient(145deg, #e7e4d9, #c9c5b8);
+  box-shadow: 0 0.15vmin 0.3vmin rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+.speaker__button:active {
+  transform: translateY(0.1vmin);
+  box-shadow: 0 0.05vmin 0.15vmin rgba(0, 0, 0, 0.45);
+}
+.speaker__button:focus-visible {
+  outline: 0.2vmin solid #33ff33;
+  outline-offset: 0.2vmin;
+}
+.speaker__top {
+  position: absolute;
+  transform: translateY(-50%) rotateX(90deg);
+  width: var(--width);
+  height: var(--depth);
+  border-radius: 0.6vmin;
+  background-color: #f3f0e4;
+}
+.speaker__side {
+  position: absolute;
+  transform: translateX(-50%) rotateY(90deg);
+  width: var(--depth);
+  height: var(--height);
+  background: linear-gradient(to top, #b8b19d 95%, #f3f0e4);
+}
+.speaker--left .speaker__side {
+  left: var(--width); /* its right side faces the middle, and you */
+}
+.speaker--right .speaker__side {
+  left: 0;
+}
+.speaker__bottom {
+  position: absolute;
+  transform: translateY(-50%) rotateX(90deg) translateZ(calc(-1 * var(--height) - 0.4vmin));
+  width: var(--width);
+  height: var(--depth);
+  background-color: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 0 1.6vmin 0.8vmin rgba(0, 0, 0, 0.2);
+}
+
 .monitor-shadow {
   position: absolute;
   top: calc(11.5vmin + 45vmin);
@@ -902,6 +1011,7 @@ body {
   box-shadow: inset 0 0 0.45vmin #3c7653;
   transform: translate(0, -0.75vmin);
   position: relative;
+  cursor: pointer; /* like everything else you can press */
 }
 .monitor__power-switch__button {
   position: absolute;

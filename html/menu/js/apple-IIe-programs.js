@@ -514,7 +514,9 @@ PROGRAMS.baseball = (machine, url) => {
  * payload: ["barzy", "<url of Barzy's assets/>"], on the same site. */
 PROGRAMS.barzy = (machine, assets) => {
     const ROWS = 20;            // graphics rows; three rows of text below
-    const SPEED = 75;           // dots a second, across and down (Barzy's page: 500 px)
+    // Dots a second, across and down, chosen with left and right. 75 is
+    // about the pace of Barzy's page (500 px a second across a screen).
+    const SPEEDS = [25, 40, 55, 75, 100, 130, 170, 220];
     const FLASH_MS = 100;       // how long an edge stays lit
     const SPRITE = { width: 56, height: 51 };
     const LEVELS = 11;          // Barzy's audio level runs 0 to 11
@@ -527,8 +529,9 @@ PROGRAMS.barzy = (machine, assets) => {
     const sounds = {};
     let level = 0;              // starts silent, as Barzy does
     let savedLevel = 6;         // what SPACE brings back
+    let speedStep = 3;          // SPEEDS[3], Barzy's own pace
     let x = 0, y = 0;
-    let dx = SPEED, dy = SPEED;
+    let dx = 1, dy = 1;         // directions; times the speed in step()
     let bounces = 0;
     let lastEdge = '';
     const flashUntil = { LEFT: 0, RIGHT: 0, TOP: 0, BOTTOM: 0 };
@@ -628,12 +631,13 @@ PROGRAMS.barzy = (machine, assets) => {
     function step(seconds) {
 	const maxX = screen.width - sprite.width;
 	const maxY = screen.height - sprite.height;
-	x += dx * seconds;
-	y += dy * seconds;
-	if (x >= maxX) { x = maxX - (x - maxX); dx = -SPEED; bounce('RIGHT'); }
-	if (x <= 0) { x = -x; dx = SPEED; bounce('LEFT'); }
-	if (y >= maxY) { y = maxY - (y - maxY); dy = -SPEED; bounce('BOTTOM'); }
-	if (y <= 0) { y = -y; dy = SPEED; bounce('TOP'); }
+	const speed = SPEEDS[speedStep];
+	x += dx * speed * seconds;
+	y += dy * speed * seconds;
+	if (x >= maxX) { x = maxX - (x - maxX); dx = -1; bounce('RIGHT'); }
+	if (x <= 0) { x = -x; dx = 1; bounce('LEFT'); }
+	if (y >= maxY) { y = maxY - (y - maxY); dy = -1; bounce('BOTTOM'); }
+	if (y <= 0) { y = -y; dy = 1; bounce('TOP'); }
     }
 
     function draw(now) {
@@ -674,10 +678,11 @@ PROGRAMS.barzy = (machine, assets) => {
 	const narrow = width() < 80;
 	const meter = '#'.repeat(level) + '.'.repeat(LEVELS - level);
 	const heard = lastEdge ? lastEdge + ' EDGE  ' + (level ? '*BEEP*' : '(MUTED)') : ' ';
+	const speedText = 'SPEED ' + (speedStep + 1) + '/' + SPEEDS.length;
 	machine.redraw([
 	    ...Array(ROWS).fill(' '),
 	    twoSided(narrow ? 'BARZY' : 'BARZY   AUDIO/VIDEO SYNC TEST',
-		     'BOUNCE ' + String(bounces).padStart(4, '0')),
+		     speedText + '   BOUNCE ' + String(bounces).padStart(4, '0')),
 	    twoSided(heard, (narrow ? 'LEVEL ' : 'AUDIO LEVEL ') + String(level).padStart(2) + ' ' + meter),
 	]);
     }
@@ -685,8 +690,8 @@ PROGRAMS.barzy = (machine, assets) => {
     return {
 	allKeys: true, // every key comes to key(), at once
 	start() {
-	    machine.setPrompt(width() < 80 ? 'UP/DOWN  SPACE MUTE  Q QUIT '
-			      : 'UP/DOWN LEVEL   SPACE MUTE   Q QUIT ');
+	    machine.setPrompt(width() < 80 ? 'UP/DN LEVEL  L/R SPEED  Q '
+			      : 'UP/DOWN LEVEL   LEFT/RIGHT SPEED   SPACE MUTE   Q QUIT ');
 	    const quietly = (promise) => promise.catch(() => null); // no sound beats no Barzy
 	    return machine.work(Promise.all([
 		machine.graphics.bitmap(assets + 'barzy-boi-trans.png', SPRITE.width, SPRITE.height),
@@ -709,10 +714,14 @@ PROGRAMS.barzy = (machine, assets) => {
 		machine.exit();
 		return machine.print([' ']);
 	    }
-	    if (['ArrowUp', 'ArrowRight', '+', '='].includes(name)) {
+	    if (['ArrowUp', '+', '='].includes(name)) {
 		level = Math.min(LEVELS, level + 1);
-	    } else if (['ArrowDown', 'ArrowLeft', '-'].includes(name)) {
+	    } else if (['ArrowDown', '-'].includes(name)) {
 		level = Math.max(0, level - 1);
+	    } else if (['ArrowRight', '>', '.'].includes(name)) {
+		speedStep = Math.min(SPEEDS.length - 1, speedStep + 1);
+	    } else if (['ArrowLeft', '<', ','].includes(name)) {
+		speedStep = Math.max(0, speedStep - 1);
 	    } else if (name === ' ') {
 		if (level) {
 		    savedLevel = level;
@@ -727,6 +736,274 @@ PROGRAMS.barzy = (machine, assets) => {
 	},
 	input() {
 	    // Every key goes to key(); nothing is typed at a prompt.
+	},
+    };
+};
+
+
+/* The telephone: what answers at each number (assets/phone-book.json) and
+ * how a call sounds. Shared by the modem (PR#2) and RUN WARDIAL. */
+const PHONE_BOOK = 'assets/phone-book.json';
+const TOUCH_TONES = { // row and column frequencies of each key
+    1: [697, 1209], 2: [697, 1336], 3: [697, 1477],
+    4: [770, 1209], 5: [770, 1336], 6: [770, 1477],
+    7: [852, 1209], 8: [852, 1336], 9: [852, 1477],
+    '*': [941, 1209], 0: [941, 1336], '#': [941, 1477],
+};
+const LINE_TONES = { dial: [350, 440], ring: [440, 480], busy: [480, 620], answer: [2225], fax: [1100] };
+
+function phoneNumber(text) {
+    // The seven-digit number in what was typed, as 555-0147, or null.
+    const digits = text.replace(/[^0-9]/g, '');
+    if (digits.length < 7 || digits.length > 11) {
+	return null;
+    }
+    const local = digits.slice(-7);
+    return local.slice(0, 3) + '-' + local.slice(3);
+}
+
+function whatAnswers(book, number) {
+    // A listed number says what's there. Any other rings out, is busy, or a
+    // person picks up, decided by its digits, so it's the same every time.
+    if (book[number]) {
+	return book[number];
+    }
+    let hash = 0;
+    for (const character of number) {
+	hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+    }
+    const roll = hash % 20;
+    if (roll < 3) {
+	return { answers: 'busy' };
+    }
+    if (roll < 6) {
+	return { answers: 'voice', says: 'Hello?' };
+    }
+    return { answers: 'none' };
+}
+
+function loadPhoneBook(machine) {
+    return machine.wait(fetch(PHONE_BOOK).then((response) => {
+	if (!response.ok) {
+	    throw new Error(PHONE_BOOK + ': ' + response.status);
+	}
+	return response.json();
+    }));
+}
+
+async function touchTones(machine, number, digitSeconds, gapSeconds) {
+    for (const digit of number.replace(/-/g, '')) {
+	await machine.sound.tone(TOUCH_TONES[digit], digitSeconds);
+	await machine.sound.pause(gapSeconds);
+    }
+}
+
+
+/* PR#2: a Hayes-style modem on a serial card in slot 2. Talk to it in AT
+ * commands; it answers OK, ERROR, or what happened to a call. PR#0 (or
+ * Ctrl-C) goes back to DOS. Its speaker is on until ATM0. */
+PROGRAMS.modem = (machine) => {
+    let book = null;
+    let speaker = true;
+
+    const sound = machine.sound;
+    const tone = (name, seconds) => speaker ? sound.tone(LINE_TONES[name], seconds) : sound.pause(seconds);
+
+    async function ring(times, onSeconds = 1.2, offSeconds = 1.6) {
+	for (let i = 0; i < times; i++) {
+	    await tone('ring', onSeconds);
+	    await sound.pause(offSeconds);
+	}
+    }
+
+    async function call(number) {
+	// Dial, listen, and say what happened, as the modem would.
+	book = book || await loadPhoneBook(machine);
+	await tone('dial', 0.8);
+	if (speaker) {
+	    await touchTones(machine, number, 0.09, 0.07);
+	} else {
+	    await sound.pause(1.1);
+	}
+	await sound.pause(0.8);
+	const there = whatAnswers(book, number);
+	switch (there.answers) {
+	case 'busy':
+	    for (let i = 0; i < 4; i++) {
+		await tone('busy', 0.5);
+		await sound.pause(0.5);
+	    }
+	    return ['BUSY'];
+	case 'voice':
+	    await ring(2);
+	    if (speaker) {
+		await sound.say(there.says || 'Hello?');
+	    } else {
+		await sound.pause(1.5);
+	    }
+	    return ['NO CARRIER'];
+	case 'fax':
+	    await ring(1);
+	    for (let i = 0; i < 2; i++) {
+		await tone('fax', 0.5);
+		await sound.pause(1);
+	    }
+	    return ['NO CARRIER'];
+	case 'computer':
+	    await ring(1);
+	    await tone('answer', 1.5);
+	    if (speaker) {
+		await sound.noise(1.2);
+	    }
+	    machine.print(['CONNECT ' + (there.baud || 300)]);
+	    // Nothing on the other end says anything yet. The line goes quiet,
+	    // then drops.
+	    await sound.pause(4);
+	    return ['NO CARRIER'];
+	default:
+	    await ring(5);
+	    return ['NO ANSWER'];
+	}
+    }
+
+    function command(text) {
+	/* One line of AT commands, which may run together: ATZ, ATH, ATI,
+	 * ATM0 (speaker off), ATM1, ATDT5550147 (dial; the rest is the number). */
+	const line = text.toUpperCase().replace(/\s+/g, '');
+	if (!line.startsWith('AT')) {
+	    return null;
+	}
+	let rest = line.slice(2);
+	while (rest) {
+	    const letter = rest[0];
+	    rest = rest.slice(1);
+	    if (letter === 'D') {
+		const number = phoneNumber(rest.replace(/^[TP]/, ''));
+		return number ? { dial: number } : { reply: 'ERROR' };
+	    }
+	    if (letter === 'Z') {
+		speaker = true;
+	    } else if (letter === 'M') {
+		speaker = rest[0] !== '0';
+		rest = rest.replace(/^\d/, '');
+	    } else if (letter === 'I') {
+		return { reply: '300' };
+	    } else if (letter !== 'H' && letter !== 'E') {
+		return { reply: 'ERROR' };
+	    } else {
+		rest = rest.replace(/^\d/, '');
+	    }
+	}
+	return { reply: 'OK' };
+    }
+
+    return {
+	start() {
+	    machine.setPrompt(''); // a modem has no prompt: you just type
+	    return machine.print([]);
+	},
+	input(text) {
+	    const typed = text.trim().toUpperCase();
+	    if (typed === 'PR#0' || typed === 'IN#0') {
+		machine.exit();
+		return machine.print([' ']);
+	    }
+	    const what = command(typed);
+	    if (!what) {
+		return machine.print([]); // not for the modem
+	    }
+	    if (what.reply) {
+		return machine.print([what.reply]);
+	    }
+	    return machine.wait(call(what.dial)).then((result) => machine.print(result));
+	},
+    };
+};
+
+
+/* RUN WARDIAL: dial every number in the 555-01xx block in turn and log
+ * which ones answer, and how. Ctrl-C stops it. */
+PROGRAMS.wardial = (machine) => {
+    const FIRST = 100;
+    const LAST = 199;
+    const log = [];
+    const found = [];
+    const sound = machine.sound;
+    const quiet = 0.05;
+
+    function show(current) {
+	machine.redraw([...log, current].slice(-(machine.rows() - 1)));
+    }
+
+    async function listen(there) {
+	// A short listen: enough to tell what answered.
+	switch (there.answers) {
+	case 'busy':
+	    await sound.tone(LINE_TONES.busy, 0.25, quiet);
+	    await sound.pause(0.25);
+	    await sound.tone(LINE_TONES.busy, 0.25, quiet);
+	    return 'BUSY';
+	case 'voice':
+	    await sound.tone(LINE_TONES.ring, 0.5, quiet);
+	    await sound.pause(0.3);
+	    return 'VOICE';
+	case 'fax':
+	    await sound.tone(LINE_TONES.ring, 0.5, quiet);
+	    await sound.pause(0.3);
+	    await sound.tone(LINE_TONES.fax, 0.4, quiet);
+	    return 'FAX';
+	case 'computer':
+	    await sound.tone(LINE_TONES.ring, 0.5, quiet);
+	    await sound.pause(0.3);
+	    await sound.tone(LINE_TONES.answer, 0.7, quiet);
+	    return 'CARRIER ' + (there.baud || 300) + '  *****';
+	default:
+	    await sound.tone(LINE_TONES.ring, 0.5, quiet);
+	    await sound.pause(0.3);
+	    return 'NO ANSWER';
+	}
+    }
+
+    async function sweep(book) {
+	for (let n = FIRST; n <= LAST; n++) {
+	    if (!machine.running()) {
+		return;
+	    }
+	    const number = '555-0' + n;
+	    show(number + '  DIALING');
+	    await sound.tone(LINE_TONES.dial, 0.15, quiet);
+	    await touchTones(machine, number, 0.05, 0.03);
+	    const there = whatAnswers(book, number);
+	    const result = await listen(there);
+	    log.push(number + '  ' + result);
+	    if (there.answers === 'computer' || there.answers === 'fax') {
+		found.push(number + '  ' + result.split(' ')[0]);
+	    }
+	}
+	if (!machine.running()) {
+	    return;
+	}
+	machine.exit();
+	machine.redraw(log.slice(-(machine.rows() - 6)));
+	machine.print([' ', (LAST - FIRST + 1) + ' NUMBERS DIALED',
+		       ...(found.length ? found : ['NOTHING ANSWERED']), ' ']);
+    }
+
+    return {
+	start() {
+	    machine.setPrompt('');
+	    log.push('WARDIAL  555-0' + FIRST + ' TO 555-0' + LAST, ' ');
+	    return loadPhoneBook(machine).then((book) => {
+		// Runs on its own; Ctrl-C stops it.
+		sweep(book).catch((error) => {
+		    console.log(error);
+		    machine.exit();
+		    machine.print([' ', 'I/O ERROR', ' ']);
+		});
+	    });
+	},
+	input() {
+	    // Typing while it dials does nothing.
 	},
     };
 };

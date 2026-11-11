@@ -44,6 +44,44 @@
   #screen { width: 100% !important; height: 100% !important; cursor: default; }
 </style>
 <script>
+  // The menu's sound button (js/apple-IIe.js, setSound) silences the //e
+  // too: every audio context made here is kept, so the menu can suspend
+  // and resume them, and none resumes itself while sound is off. ?muted in
+  // the URL starts it off.
+  (function () {
+    const Base = window.AudioContext || window.webkitAudioContext;
+    if (!Base) {
+      return;
+    }
+    window.menuMuted = new URLSearchParams(location.search).has('muted');
+    window.menuAudioContexts = [];
+    class MenuAudioContext extends Base {
+      constructor(...args) {
+        super(...args);
+        window.menuAudioContexts.push(this);
+        if (window.menuMuted) {
+          super.suspend();
+        }
+      }
+      resume() {
+        return window.menuMuted ? Promise.resolve() : super.resume();
+      }
+    }
+    window.AudioContext = MenuAudioContext;
+    window.webkitAudioContext = MenuAudioContext;
+    window.menuSetMuted = (muted) => {
+      window.menuMuted = muted;
+      for (const context of window.menuAudioContexts) {
+        if (muted) {
+          context.suspend();
+        } else {
+          Base.prototype.resume.call(context);
+        }
+      }
+    };
+  })();
+</script>
+<script>
   // On a real //e the DELETE key sends 127, which INPUT ignores; only the
   // left arrow backs up. Backspace is what people reach for now, so it
   // sends the left arrow. Ctrl-Backspace is still a true DELETE.

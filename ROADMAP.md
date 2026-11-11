@@ -104,8 +104,9 @@ DUNGEONEER.com is its own site, so on the Apple it stays a link plus doors:
 
 - [ ] The generators as programs or BBS doors, asking their questions at the
       prompt. See "Discord-style tools" below.
-- [ ] Armoria, the fantasy maps and the gaming interstitials stay links:
-      they're graphical.
+- Armoria, the fantasy maps and the gaming interstitials are Dungeoneer's
+  own, so they aren't on the Apple's disk (nor is VDO). The plain menu and
+  the gopher hole still list them.
 
 ## Bugs
 
@@ -210,6 +211,33 @@ reach the BBS and the other "places you connect to".
 - [ ] Maybe real telnet BBSes that still run. That needs a long-lived
       connection, which the stateless CGI proxy can't hold.
 
+### WOPR: a computer that wants to play
+
+An homage to *WarGames* (1983): what its hero does is what this Apple is
+becoming. All of it original: the film's dialogue, its computer's name, its
+game list and its backdoor stay in the film; the experience is the homage.
+
+1. **Wardial** the 555-01xx block (the numbers set aside for fiction) and
+   find a carrier that isn't on any list.
+2. **Dial it.** An old research computer, with a name of its own, asks for a
+   logon. Guesses fail.
+3. **The backdoor** is something personal to the person who built it. The
+   clues are scattered across this disk, the BBS and the gopher hole:
+   nobody tells you, you research.
+4. **Games:** its own list, ordinary 1980s games beside war-sounding
+   simulations. Some playable, some only tempting.
+5. **The war simulation:** a big board in hi-res, a vector map, tracks and
+   countdowns, narrated in a synthesized voice (the browser's speech).
+6. **The lesson:** a game nobody can win, which the computer plays against
+   itself faster and faster until it reaches its own conclusion. It can lead
+   into the WOPR interstitials page.
+
+- [ ] The modem and `RUN WARDIAL` (started).
+- [ ] The computer: its name, its voice, its logon and its games. The writing
+      is the art; drafts for you to rewrite.
+- [ ] The trail of clues to the backdoor, across the disk, the BBS and gopher.
+- [ ] The big board and the unwinnable game, on the graphics layer.
+
 ### The Thoughtrights BBS
 
 A main menu after the login banner and the new-caller agreement (the site's
@@ -291,10 +319,27 @@ Gamer/Fantasy Gamer No. 77, which bin.sh describes as public domain and not to
 be sold or used for profit. (The Paranoia artwork is West End Games' and
 shouldn't come along.)
 
+Pinned (2026-11-11): you may write to drow@bin.sh once this project's
+framework is further along. It's an art project, which is how to put it to
+him. Three places the text may still be:
+
+- **Doug Rau**, who still runs bin.sh: whether the CGI's data survives.
+- **The magazine:** Space Gamer/Fantasy Gamer No. 77 (Jan/Feb 1987) is
+  scanned on the Internet Archive
+  (archive.org/download/space-gamer-77/Space_Gamer_77_text.pdf). Its
+  contents list a Paranoia mini solo adventure on page 16; the issue's own
+  byline would confirm Sam Shirley. Not downloaded or read yet.
+- **The Wayback Machine,** if it captured `alpha.cgi` section by section.
+  Not checked: it's at web.archive.org/web/*/bin.sh/gaming/alpha/*.
+
+Before it goes up, two things to settle: what the author actually allowed
+(bin.sh's "public domain, not for profit" is bin.sh's account), and that the
+setting itself (Alpha Complex, the Computer) belongs to Paranoia's owners;
+a free, credited, non-commercial homage is the usual footing, not a licence.
+
 To bring it back inside the terminal:
 
-- [ ] Get the source text: the magazine issue, or ask Doug Rau whether the
-      CGI's data survives.
+- [ ] Get the source text, from one of the three above.
 - [ ] Store the sections and choices as data and play them with one small
       program: numbered choices, six clones, "not selecting an option is
       treason".

@@ -216,16 +216,6 @@
 	"action": "alias",
 	"payload": ["BRUN TEMP3RCAST"]
     },
-    "BRUN VDO" : {
-	"action": "redirect",
-	"type": "B",
-	"sectors": 14,
-	"payload": ["https://www.thoughtrights.com/vdo/"]
-    },
-    "RUN VDO" : {
-	"action": "alias",
-	"payload": ["BRUN VDO"]
-    },
     "BRUN NYC CAM" : {
 	"action": "redirect",
 	"type": "B",
@@ -241,36 +231,6 @@
 	"type": "T",
 	"sectors": 3,
 	"payload": ["https://github.com/tech-hunterdon"]
-    },
-    "BRUN GAMING INTERSTITIALS" : {
-	"action": "redirect",
-	"type": "B",
-	"sectors": 10,
-	"payload": ["https://www.dungeoneer.com/cgi-bin/dragons/dnd-handout/dnd-interstitials.py"]
-    },
-    "RUN GAMING INTERSTITIALS" : {
-	"action": "alias",
-	"payload": ["BRUN GAMING INTERSTITIALS"]
-    },
-    "BRUN ARMORIA" : {
-	"action": "redirect",
-	"type": "B",
-	"sectors": 9,
-	"payload": ["https://www.dungeoneer.com/dungeoneer/shields/"]
-    },
-    "RUN ARMORIA" : {
-	"action": "alias",
-	"payload": ["BRUN ARMORIA"]
-    },
-    "BRUN FANTASY MAPS" : {
-	"action": "redirect",
-	"type": "B",
-	"sectors": 22,
-	"payload": ["https://www.dungeoneer.com/dungeoneer/maps/"]
-    },
-    "RUN FANTASY MAPS" : {
-	"action": "alias",
-	"payload": ["BRUN FANTASY MAPS"]
     },
     "RUN BASEBALL" : {
 	"action": "program",
@@ -397,6 +357,20 @@
     "RUN KARATEKA" : {
 	"action": "alias",
 	"payload": ["BRUN KARATEKA"]
+    },
+    "RUN WARDIAL" : {
+	"action": "program",
+	"type": "A",
+	"sectors": 9,
+	"payload": ["wardial"]
+    },
+    "PR#2" : {
+	"action": "program",
+	"payload": ["modem"]
+    },
+    "IN#2" : {
+	"action": "alias",
+	"payload": ["PR#2"]
     },
     "HELP": {
 	"action": "print",

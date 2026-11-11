@@ -1,0 +1,15 @@
+{
+    "_about": [
+	"What answers at each number the modem dials (PR#2, ATDT) and RUN WARDIAL",
+	"sweeps. Numbers are 555-01xx, the block set aside for fiction. Any number",
+	"not listed rings out, is busy, or a person answers, the same every time.",
+	"answers: computer (a carrier: CONNECT), fax, busy, voice (says: spoken).",
+	"Nobody is told these numbers; they turn up on the disk, the BBS, gopher."
+    ],
+    "555-0105": { "answers": "voice", "says": "You again? Stop calling this number." },
+    "555-0118": { "answers": "busy" },
+    "555-0132": { "answers": "fax" },
+    "555-0147": { "answers": "computer", "baud": 300 },
+    "555-0161": { "answers": "voice", "says": "Hello? Hello? Kids." },
+    "555-0183": { "answers": "voice", "says": "Thank you for calling. Please hold." }
+}
