@@ -49,21 +49,23 @@ rather than just being redirected to. Heaviest first:
 
 ### Baseball cards: heavy, and first
 
-`RUN BASEBALL` only opens the web page. A browser inside the Apple, from the
-mockups: a list (set, number, player, team, value; type a name to find it;
-filter by team or set; sort by value) and a card screen with the scan dithered
-into green dots and "also in the box" counts.
+`RUN BASEBALL` is a browser inside the Apple: the list with a highlight bar
+(arrow keys, RETURN for the card, or type a number), a name to find, a team
+or set to pick, three sorts; and a card screen with the card's whole photo
+dithered into green dots, and "also in the box" counts. What's left:
 
-- [ ] The list. Text only, so it needs only the first groundwork step (a
-      program that owns the screen and the keys).
-- [ ] The card picture. Needs the graphics layer, and finding each card's
-      edges in the scan, which includes the desk around it.
 - [ ] Decide: show the key line at the bottom (period programs did), and show
       dollar values and the collection's total (already public on the web
       page)?
-- Data: `/baseball-cards/baseballCards.json`, same origin as the Apple, so no
-  proxy. The proposals count 508 cards from 1952 to 1955; the mockup's header
-  says 1953–1955 and needs correcting. Not rechecked here.
+- [ ] Phones: no arrow keys on a phone keyboard (type a number instead), and
+      no picture at 40 columns, where the card's text fills the screen.
+- [ ] A way to the web page, which `RUN BASEBALL` used to open.
+- [ ] Data error, in the baseball-cards repository: the two "Art Houtteman"
+      records point at different scans, and `1954081-398918245-front.jpg`
+      is Jim Hegan. There may be others like it.
+- Data: `/baseball-cards/baseballCards.json` and the scans beside it, same
+  origin as the Apple, so no proxy. On the dev server they come from the
+  public baseball-cards repository the first time they're asked for.
 
 ### Barzy: heavy, but later
 
@@ -348,13 +350,15 @@ Decided against, so nobody has to research these again:
 The code grew from a 3D model into a UI. Before the bigger features (the
 baseball browser and Barzy need the first three):
 
-- [ ] A "current program" that owns the screen and the keys, for highlight
-      bars and arrow keys: the DOS prompt, the modem, the BBS, the browser, a
-      game. Each one exits back to the one before.
-- [ ] A graphics layer: a 560x192 canvas over the text screen lines up with
-      the 80x24 characters exactly (7x8 dots each); one Apple hi-res dot is
-      two canvas pixels wide. Mixed mode is 160 rows of graphics over four
-      rows of text.
+- [ ] A "current program" that owns the screen and the keys: the DOS
+      prompt, the modem, the BBS, the browser, a game, each exiting back to
+      the one before. Started: a program can take the arrow and page keys
+      (`key()`), redraw the screen at once, and show inverse lines.
+- [ ] The graphics layer: built as a canvas over the text, lined up with its
+      cells (7x8 dots each; on 80 columns a hi-res dot is two canvas pixels
+      wide), with `machine.graphics.picture()` for dithered photos. Still to
+      come: drawing dots and lines for Barzy, and mixed mode (graphics over
+      four rows of text).
 - [ ] Sound with Web Audio: Barzy's beep, the modem, the drive.
 - [ ] One input function that every source (physical keys, on-screen keys,
       phone field) feeds into.

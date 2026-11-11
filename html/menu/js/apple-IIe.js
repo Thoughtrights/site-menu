@@ -20,6 +20,7 @@ const MAX_LINE_LENGTH = 80; // columns on screen; longer lines wrap
 const MAX_INPUT_LENGTH = 240; // the prompt plus 239 typed characters, as on the real thing
 const MAX_ROWS = 22;
 const OUTPUT_SPEED = 350;
+const SCREEN_DRAW_SPEED = 15; // a program drawing its own screen: ms a line
 const COMMAND_JSON = 'assets/command-data.json';
 const REDIRECT_SECONDS = 7;
 const MAX_SEQUENTIAL_SYNTAX_ERRORS = 3;
@@ -76,6 +77,8 @@ let working = false;      // the program is waiting on the network
 // Timers that belong to the running machine. Power off cancels them all.
 let output = null;        // the listing being printed, if any
 let resumeOutput = null;  // a CATALOG stopped at a full screen: call to go on
+let graphicsCanvas = null;   // the graphics layer, once a program has drawn
+let graphicsGeneration = 0;  // bumped by clearGraphics(), so a late picture isn't drawn
 let redirectTimer = null;
 let powerOffTimer = null;
 let floppyTimer = null;
@@ -791,14 +794,24 @@ document.addEventListener('keydown', (event) => {
 	  (keycode > 218 && keycode < 223); // [\]' (in order)
     const isArrow = keycode > 36 && keycode < 41;
 
+    const isPageKey = event.key === 'PageUp' || event.key === 'PageDown';
+
     // The whole page is the keyboard: don't let these scroll the page,
     // move focus, or open Firefox's quick-find (' and /).
-    if (isPrintable || isArrow || keycode == TAB) {
+    if (isPrintable || isArrow || keycode == TAB || (isPageKey && program)) {
 	event.preventDefault();
     }
 
     if (!acceptingInput()) {
 	return; // the machine is off or busy
+    }
+
+    if (program && program.key && (isArrow || isPageKey)) {
+	// A program that takes these keys gets them straight away (a
+	// highlight bar), rather than waiting for RETURN.
+	const current = program;
+	runProgramStep(() => current.key(event.key));
+	return;
     }
 
     if (isPrintable) {
@@ -885,6 +898,45 @@ function makeMachine(token) {
 	    // Prints the lines, then the prompt.
 	    return alive() ? showArrayData(textLines) : new Promise(() => {});
 	},
+	show(textLines) {
+	    // Clears the screen (Applesoft's HOME) and draws a whole screen
+	    // quickly, as a program's own display does, then the prompt.
+	    if (!alive()) {
+		return new Promise(() => {});
+	    }
+	    cancelOutput();
+	    lines.length = 0;
+	    return showArrayData(textLines, 0, SCREEN_DRAW_SPEED);
+	},
+	redraw(textLines) {
+	    // Replaces the screen at once, keeping anything half typed at the
+	    // prompt: for a key like an arrow, which shouldn't wait on a draw.
+	    if (!alive()) {
+		return;
+	    }
+	    cancelOutput();
+	    const current = lines[lines.length - 1] || '';
+	    const typed = current.startsWith(promptText) ? current.slice(promptText.length) : '';
+	    lines.length = 0;
+	    lines.push(...textLines.map(toScreenText), promptText + typed);
+	    render();
+	},
+	inverse(text) {
+	    // A line shown dark on green, for a highlight bar.
+	    return INVERSE + text;
+	},
+	graphics: {
+	    // Hi-res dots over the text, in text-cell coordinates.
+	    clear() {
+		if (alive()) {
+		    clearGraphics();
+		}
+	    },
+	    picture(url, box) {
+		// box: { column, row, columns, rows }. Resolves once drawn.
+		return alive() ? drawPicture(url, box) : Promise.resolve();
+	    },
+	},
 	work(promise) {
 	    // Wait for the network with the drive light on and input off.
 	    if (!alive()) {
@@ -912,6 +964,7 @@ function makeMachine(token) {
 function endProgram() {
     programToken++;
     program = null;
+    clearGraphics();
     if (working) {
 	stopFloppy(); // broken off while it waited on the network
     }
@@ -1134,9 +1187,14 @@ function animateKey(keyCode) {
 
 const terminal = document.querySelector('.monitor__terminal');
 
+// A line that starts with this is shown in inverse video, dark on green,
+// as the IIe's own INVERSE did. Programs get it from machine.inverse().
+const INVERSE = '\u0001';
+
 function screenRows(text) {
     // Long lines wrap onto the next screen row.
-    return Math.max(1, Math.ceil(text.length / columns));
+    const length = text.startsWith(INVERSE) ? text.length - 1 : text.length;
+    return Math.max(1, Math.ceil(length / columns));
 }
 
 function render() {
@@ -1148,18 +1206,143 @@ function render() {
     }
     line = lines.length - 1;
 
-    terminal.innerHTML = '';
+    const screen = [];
     for (let i = 0; i < lines.length; i++) {
 	const lastLine = i === lines.length - 1;
-	for (let start = 0; start < lines[i].length || start === 0; start += columns) {
+	const inverse = lines[i].startsWith(INVERSE);
+	const text = inverse ? lines[i].slice(1) : lines[i];
+	for (let start = 0; start < text.length || start === 0; start += columns) {
 	    const divLine = document.createElement('div');
-	    divLine.textContent = lines[i].slice(start, start + columns);
-	    if (lastLine && start + columns >= lines[i].length) {
+	    if (inverse) {
+		const span = document.createElement('span');
+		span.className = 'inverse';
+		span.textContent = text.slice(start, start + columns);
+		divLine.appendChild(span);
+	    } else {
+		divLine.textContent = text.slice(start, start + columns);
+	    }
+	    if (lastLine && start + columns >= text.length) {
 		const cursor = document.createElement('span');
 		cursor.classList.add('cursor');
 		divLine.appendChild(cursor);
 	    }
-	    terminal.appendChild(divLine);
+	    screen.push(divLine);
+	}
+    }
+    if (graphicsCanvas) {
+	screen.push(graphicsCanvas); // the graphics layer stays over the text
+    }
+    terminal.replaceChildren(...screen);
+}
+
+/* The graphics layer: Apple hi-res dots over the text screen, lined up
+ * with it. One text cell is 7 dots wide and 8 high; on 80 columns each
+ * hi-res dot is two canvas pixels wide, as with the IIe's 80-column card.
+ * Programs reach it as machine.graphics. */
+function graphicsLayer() {
+    // The canvas, sized to the text grid as it is laid out right now.
+    if (!graphicsCanvas) {
+	graphicsCanvas = document.createElement('canvas');
+	graphicsCanvas.className = 'monitor__graphics';
+	graphicsCanvas.setAttribute('aria-hidden', 'true');
+	terminal.appendChild(graphicsCanvas);
+    }
+    const style = getComputedStyle(terminal);
+    const rows = MAX_ROWS + 1;
+    // Measure a whole screen of text: layout sizes (not the 3D-transformed
+    // ones), and whole pixels spread over every row and column, not one.
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre';
+    probe.textContent = Array(rows).fill('M'.repeat(columns)).join('\n');
+    terminal.appendChild(probe);
+    const cellWidth = probe.offsetWidth / columns;
+    const cellHeight = probe.offsetHeight / rows;
+    probe.remove();
+    const width = columns * 7;
+    const height = rows * 8;
+    if (graphicsCanvas.width !== width || graphicsCanvas.height !== height) {
+	graphicsCanvas.width = width;
+	graphicsCanvas.height = height;
+    }
+    Object.assign(graphicsCanvas.style, {
+	left: style.paddingLeft,
+	top: style.paddingTop,
+	width: (columns * cellWidth) + 'px',
+	height: (rows * cellHeight) + 'px',
+    });
+    return { canvas: graphicsCanvas, cellWidth, cellHeight, dotWidth: columns === 80 ? 2 : 1 };
+}
+
+function clearGraphics() {
+    graphicsGeneration++;
+    if (graphicsCanvas) {
+	graphicsCanvas.getContext('2d').clearRect(0, 0, graphicsCanvas.width, graphicsCanvas.height);
+    }
+}
+
+function loadImage(url) {
+    // The load event, not image.decode(), which a browser may put off
+    // while the page is in the background.
+    return new Promise((resolve, reject) => {
+	const image = new Image();
+	image.onload = () => resolve(image);
+	image.onerror = () => reject(new Error(url + ': not loaded'));
+	image.src = url;
+    });
+}
+
+async function drawPicture(url, box) {
+    /* A whole photo, dithered to green hi-res dots and scaled to fit,
+     * centred in a box of text cells: { column, row, columns, rows }. */
+    const generation = graphicsGeneration;
+    const image = await loadImage(url);
+    if (generation !== graphicsGeneration || !on) {
+	return; // the screen moved on while it loaded
+    }
+    const { canvas, cellWidth, cellHeight, dotWidth } = graphicsLayer();
+    const source = { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
+    // Keep the photo's shape on screen: a dot is not square.
+    const dotAspect = (cellWidth / 7 * dotWidth) / (cellHeight / 8);
+    const boxWidth = Math.floor(box.columns * 7 / dotWidth);
+    const boxHeight = box.rows * 8;
+    let height = boxHeight;
+    let width = Math.round(height * (source.width / source.height) / dotAspect);
+    if (width > boxWidth) {
+	width = boxWidth;
+	height = Math.round(width * dotAspect * source.height / source.width);
+    }
+    const work = document.createElement('canvas');
+    work.width = width;
+    work.height = height;
+    const workContext = work.getContext('2d', { willReadFrequently: true });
+    workContext.drawImage(image, source.x, source.y, source.width, source.height, 0, 0, width, height);
+    const pixels = workContext.getImageData(0, 0, width, height).data;
+
+    // Brightness with a little more contrast, then Floyd-Steinberg to on/off.
+    const level = new Float32Array(width * height);
+    for (let i = 0; i < level.length; i++) {
+	const brightness = (0.299 * pixels[i * 4] + 0.587 * pixels[i * 4 + 1] +
+			    0.114 * pixels[i * 4 + 2]) / 255;
+	level[i] = (brightness - 0.5) * 1.35 + 0.52;
+    }
+    const context = canvas.getContext('2d');
+    context.fillStyle = getComputedStyle(terminal).color;
+    const left = box.column * 7 + Math.floor((boxWidth - width) / 2) * dotWidth;
+    const top = box.row * 8 + Math.floor((boxHeight - height) / 2);
+    for (let y = 0; y < height; y++) {
+	for (let x = 0; x < width; x++) {
+	    const i = y * width + x;
+	    const lit = level[i] >= 0.5;
+	    const error = level[i] - (lit ? 1 : 0);
+	    if (x + 1 < width) level[i + 1] += error * 7 / 16;
+	    if (y + 1 < height) {
+		if (x > 0) level[i + width - 1] += error * 3 / 16;
+		level[i + width] += error * 5 / 16;
+		if (x + 1 < width) level[i + width + 1] += error / 16;
+	    }
+	    if (lit) {
+		context.fillRect(left + x * dotWidth, top + y, dotWidth, 1);
+	    }
 	}
     }
 }
@@ -1228,7 +1411,7 @@ function showData(inputData) {
     return showArrayData(inputData.split('\n'));
 }
 
-function showArrayData(dataLines, pageRows = 0) {
+function showArrayData(dataLines, pageRows = 0, speed = OUTPUT_SPEED) {
     /* Print lines one at a time, then the prompt. With pageRows, stop
      * after that many screen rows until a key is pressed, as DOS 3.3's
      * CATALOG did: no message, just no prompt yet. */
@@ -1254,7 +1437,7 @@ function showArrayData(dataLines, pageRows = 0) {
 		    resumeOutput = null;
 		    rowsShown = 0;
 		    readFromFloppy(5);
-		    output = setInterval(printNext, OUTPUT_SPEED);
+		    output = setInterval(printNext, speed);
 		};
 		return;
 	    }
@@ -1264,6 +1447,6 @@ function showArrayData(dataLines, pageRows = 0) {
 	    line++;
 	    render();
 	};
-	output = setInterval(printNext, OUTPUT_SPEED);
+	output = setInterval(printNext, speed);
     });
 }

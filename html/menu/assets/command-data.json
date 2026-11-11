@@ -273,10 +273,10 @@
 	"payload": ["BRUN FANTASY MAPS"]
     },
     "RUN BASEBALL" : {
-	"action": "redirect",
+	"action": "program",
 	"type": "A",
 	"sectors": 12,
-	"payload": ["https://www.thoughtrights.com/baseball-cards/"]
+	"payload": ["baseball", "/baseball-cards/baseballCards.json"]
     },
     "BRUN ALPHACOMPLEX" : {
 	"action": "redirect",

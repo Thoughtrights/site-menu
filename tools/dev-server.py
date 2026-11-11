@@ -12,17 +12,46 @@ from and keeps its cache in /tmp.
 
 import http.server
 import os
+import re
 import subprocess
 import sys
+import urllib.request
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'html')
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
+BASEBALL_CARDS = 'https://raw.githubusercontent.com/Thoughtrights/baseball-cards/main/'
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
+
+    def do_GET(self):
+        self.fetch_baseball_card()
+        super().do_GET()
+
+    def fetch_baseball_card(self):
+        # RUN BASEBALL reads /baseball-cards/, which the live site has and
+        # this repository doesn't. The first time a file there is asked
+        # for, copy it from the public baseball-cards repository and keep
+        # it (html/baseball-cards/ is gitignored). The scans are 258 MB in
+        # all, so only the ones looked at come down.
+        match = re.fullmatch(r'/baseball-cards/([A-Za-z0-9._-]+\.(?:jpg|json))', self.path.split('?')[0])
+        if not match:
+            return
+        local = os.path.join(ROOT, 'baseball-cards', match.group(1))
+        if os.path.isfile(local):
+            return
+        try:
+            with urllib.request.urlopen(BASEBALL_CARDS + match.group(1), timeout=20) as response:
+                body = response.read()
+        except OSError as error:
+            sys.stderr.write('baseball-cards: %s: %s\n' % (match.group(1), error))
+            return
+        os.makedirs(os.path.dirname(local), exist_ok=True)
+        with open(local, 'wb') as f:
+            f.write(body)
 
     def translate_path(self, path):
         # The Apple is the front door, as Apache's DirectoryIndex makes it

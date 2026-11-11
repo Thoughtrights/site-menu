@@ -5,5 +5,10 @@ __pycache__/
 # Listed in DISKS_NOT_SHIPPED in tests/test_site.py.
 html/menu/assets/disks/karateka.dsk
 
+# A local copy of the baseball cards' data for RUN BASEBALL on the dev
+# server. The live site already has it; it belongs to the baseball-cards
+# repository (github.com/Thoughtrights/baseball-cards).
+html/baseball-cards/
+
 # Written by deploy/deploy.sh at each deploy.
 html/menu/version.json
