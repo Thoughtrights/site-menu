@@ -42,7 +42,38 @@
   #header, .inset, #reset-row, #keyboard, #exit-fullscreen { display: none !important; }
   #display, .apple2e #display, .overscan { position: absolute; inset: 0; margin: 0; padding: 0; width: auto; height: auto; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
   #screen { width: 100% !important; height: 100% !important; cursor: default; }
+  .modal { display: none !important; } /* saving a disk opens one; it stays out of sight */
 </style>
+<script>
+  // Saving a disk that changes (Eamon writes your character to its disk).
+  // The menu (js/apple-IIe.js, keepDisk) calls save(), which resolves with
+  // drive 1's disk as bytes, using apple2js's own save. The saved copy
+  // comes back as the disk named after the # when the //e is next booted.
+  window.menuDisk = {
+    save() {
+      const link = document.querySelector('#local_save_link');
+      const before = link.href;
+      window.Apple2.openSave(1, { metaKey: false });
+      return new Promise((resolve, reject) => {
+        const started = Date.now();
+        const check = () => {
+          if (link.href && link.href !== before) {
+            const close = document.querySelector('#save-modal [data-micromodal-close]');
+            if (close) {
+              close.click();
+            }
+            fetch(link.href).then((response) => response.arrayBuffer()).then(resolve, reject);
+          } else if (Date.now() - started > 5000) {
+            reject(new Error('no disk to save'));
+          } else {
+            setTimeout(check, 50);
+          }
+        };
+        check();
+      });
+    },
+  };
+</script>
 <script>
   // The menu's sound button (js/apple-IIe.js, setSound) silences the //e
   // too: every audio context made here is kept, so the menu can suspend

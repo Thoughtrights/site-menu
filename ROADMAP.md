@@ -159,6 +159,10 @@ real one holds 560. Some entries aren't really disks at all.
       the IN USE light responding. A second drive for `CATALOG,D2` and
       two-disk programs.
 - [ ] Each disk has its own `CATALOG` and volume number.
+- [x] Eamon keeps its changes (your character): its disk is saved to the
+      browser every 20 seconds and at power off, and boots from the saved
+      copy next time. Not yet tried with a real character saved and loaded.
+- [ ] A way to start Eamon fresh, throwing the saved copy away.
 - [ ] More Eamon adventures in drive 2 (`#master|adventure`).
 - [ ] Image the Apple II floppies at home and add the Eamon adventures written
       on them. See the tools listed under "Getting disks" in INSTALLATION.md.
@@ -204,8 +208,15 @@ reach the BBS and the other "places you connect to".
 - [ ] A phone book of numbers in a data file. Each number is a BBS or service.
       Nobody gives you the numbers: they turn up in files on the disk, in the
       job post, on a BBS.
-- [ ] `RUN WARDIAL`: scans the 555 exchange and reports which numbers answer.
-      It's how visitors find the one-offs (WOPR, say) without being told.
+- [x] `RUN DEMONDIAL`: sweeps 555-0100 to 555-0199 and logs what answers;
+      carriers and faxes go into `DEMONDIAL LOG`, a file that appears in
+      `CATALOG` (kept in the browser). What's out there so far, in
+      `assets/phone-book.json`: Hellhound Software's BBS (555-0127, 1200
+      baud: a game company, Dungeoneer in development, leave the sysop a
+      message), a line of modem noise (555-0139), daemous (555-0147),
+      MAXWELL (555-0158), two faxes, a weather line and people who pick up.
+- [ ] More behind the numbers, as they're written: the BBS growing doors, a
+      second game company, a number that only answers late at night.
 - [ ] Reaching the modem from inside the //e: a simulated serial card in
       apple2js, so a BASIC program can dial out too.
 - [ ] Maybe real telnet BBSes that still run. That needs a long-lived
@@ -232,9 +243,27 @@ game list and its backdoor stay in the film; the experience is the homage.
    itself faster and faster until it reaches its own conclusion. It can lead
    into the WOPR interstitials page.
 
-- [ ] The modem and `RUN WARDIAL` (started).
-- [ ] The computer: its name, its voice, its logon and its games. The writing
-      is the art; drafts for you to rewrite.
+- [x] The modem (`PR#2`: dial, go online, `+++`, `ATO`, `ATH`, `ATDL`) and
+      `RUN DEMONDIAL`.
+- [x] `RUN DIALUP`: a dialing directory of what `DEMONDIAL LOG` found. Arrow
+      keys and RETURN, or type any number; back at the directory when the
+      line drops.
+- [x] Fair ways in: every logon takes `guest` (a smaller area that hints at
+      the rest), `help` (says what the accounts are) and `admin` (asks for
+      the password, which opens everything). Three wrong answers and the line
+      drops. This is an exploration, not a hacking puzzle.
+- [x] **daemous** (555-0147): the mind from the brain scan, all lowercase.
+      Guests may talk; it tells them it looks different upside down. The
+      admin password is its name turned upside down, `snowaep`, which also
+      works at the logon. Inside, it answers who, how and why, and admin
+      gets its memories: drafts to rewrite.
+- [x] **MAXWELL** (555-0158): an old research computer, named for Maxwell's
+      demon. Its banner says to log on as guest; the guest notes explain the
+      demon, list other lines that answer, and say its namesake's first name
+      opens the rest (`james`). Admin reads a short research log. Drafts.
+- [ ] **The war computer**, for playing the hero: original, not the film's
+      WOPR. It needs a name and a backdoor; then its voice, its games, the
+      big board and the unwinnable game.
 - [ ] The trail of clues to the backdoor, across the disk, the BBS and gopher.
 - [ ] The big board and the unwinnable game, on the graphics layer.
 

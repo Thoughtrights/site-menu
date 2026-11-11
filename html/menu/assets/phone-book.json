@@ -1,15 +1,21 @@
 {
     "_about": [
-	"What answers at each number the modem dials (PR#2, ATDT) and RUN WARDIAL",
+	"What answers at each number the modem dials (PR#2, ATDT) and RUN DEMONDIAL",
 	"sweeps. Numbers are 555-01xx, the block set aside for fiction. Any number",
 	"not listed rings out, is busy, or a person answers, the same every time.",
-	"answers: computer (a carrier: CONNECT), fax, busy, voice (says: spoken).",
+	"answers: computer (a carrier: CONNECT at baud), fax, busy, voice (says:",
+	"spoken). A computer's system is in SYSTEMS in js/apple-IIe-programs.js.",
 	"Nobody is told these numbers; they turn up on the disk, the BBS, gopher."
     ],
     "555-0105": { "answers": "voice", "says": "You again? Stop calling this number." },
+    "555-0113": { "answers": "fax" },
     "555-0118": { "answers": "busy" },
-    "555-0132": { "answers": "fax" },
-    "555-0147": { "answers": "computer", "baud": 300 },
+    "555-0127": { "answers": "computer", "baud": 1200, "system": "hellhound" },
+    "555-0139": { "answers": "computer", "baud": 300, "system": "noise" },
+    "555-0147": { "answers": "computer", "baud": 300, "system": "daemous", "password": "snowaep" },
+    "555-0158": { "answers": "computer", "baud": 300, "system": "maxwell", "password": "james" },
     "555-0161": { "answers": "voice", "says": "Hello? Hello? Kids." },
-    "555-0183": { "answers": "voice", "says": "Thank you for calling. Please hold." }
+    "555-0172": { "answers": "voice", "says": "Thoughtrights weather. Partly cloudy today, high near seventy. Clear tonight." },
+    "555-0183": { "answers": "voice", "says": "Thank you for calling. Please hold." },
+    "555-0194": { "answers": "fax" }
 }

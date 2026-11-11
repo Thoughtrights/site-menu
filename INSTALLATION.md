@@ -350,6 +350,11 @@ there, the command prints `I/O ERROR`. To add another disk, copy the file in and
 }
 ```
 
+Add `"save": true` to a disk that the program writes to, as Eamon writes
+your character. While it runs, the disk is saved to the visitor's browser
+every 20 seconds and at power off, and the next boot starts from the saved
+copy. Nothing is sent to the server.
+
 ### Getting disks
 
 Only add disks you may share: your own work, public-domain software, or

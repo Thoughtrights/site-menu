@@ -747,6 +747,44 @@ function diskFiles() {
 const commands = loadCommands(COMMAND_JSON);
 const files = diskFiles();
 
+/* Text files a program writes to the disk (RUN DEMONDIAL's log, say).
+ * They show up in CATALOG and OPEN like any other, and are kept in this
+ * browser, so they're still there next time. */
+const SAVED_FILES = 'apple-IIe-files';
+
+function addDiskFile(name, textLines) {
+    const characters = textLines.reduce((total, text) => total + text.length + 1, 0);
+    commands[normalizeCommand('OPEN ' + name)] = {
+	action: 'print',
+	type: 'T',
+	sectors: Math.max(1, Math.ceil(characters / 256)),
+	payload: textLines,
+    };
+    files.add(normalizeCommand(name));
+}
+
+function saveDiskFile(name, textLines) {
+    addDiskFile(name, textLines);
+    try {
+	const saved = JSON.parse(window.localStorage.getItem(SAVED_FILES) || '{}');
+	saved[name] = textLines;
+	window.localStorage.setItem(SAVED_FILES, JSON.stringify(saved));
+    } catch (error) {
+	// not kept past this visit, which is fine
+    }
+}
+
+try {
+    const saved = JSON.parse(window.localStorage.getItem(SAVED_FILES) || '{}');
+    for (const name in saved) {
+	if (Array.isArray(saved[name])) {
+	    addDiskFile(name, saved[name].map(String));
+	}
+    }
+} catch (error) {
+    // nothing saved, or no storage
+}
+
 
 document.addEventListener('keyup', (event) => {
     // Let go of a key forwarded to the //e (see keydown).
@@ -939,8 +977,11 @@ function makeMachine(token) {
 		return;
 	    }
 	    cancelOutput();
+	    // With no prompt (RUN DEMONDIAL's, say) the last line can't be told
+	    // from the command just entered (]RUN DEMONDIAL), so nothing carries.
 	    const current = lines[lines.length - 1] || '';
-	    const typed = current.startsWith(promptText) ? current.slice(promptText.length) : '';
+	    const typed = promptText && current.startsWith(promptText)
+		  ? current.slice(promptText.length) : '';
 	    lines.length = 0;
 	    lines.push(...textLines.map(toScreenText), promptText + typed);
 	    render();
@@ -1003,6 +1044,17 @@ function makeMachine(token) {
 	    });
 	},
 	running: () => alive(), // false once the program is broken off: stop animating
+	saveFile(name, textLines) {
+	    // A text file on the disk, in CATALOG and OPEN-able, kept in this browser.
+	    if (alive()) {
+		saveDiskFile(name, textLines);
+	    }
+	},
+	readFile(name) {
+	    // A text file's lines (one saveFile wrote, or one OPEN shows), or null.
+	    const file = commands[normalizeCommand('OPEN ' + name)];
+	    return file && file.action === 'print' ? file.payload.map((text) => String(text).replace(/\n$/, '')) : null;
+	},
 	work(promise) {
 	    // Wait for the network with the drive light on and input off.
 	    if (!alive()) {
@@ -1063,18 +1115,53 @@ function startProgram(name, args) {
 }
 
 
-function bootDisk(disk) {
+/* Disks that keep their changes ("save": true in command-data.json, such as
+ * Eamon, which writes your character to its disk). While one runs it is
+ * saved to this browser every little while and at power off, and the next
+ * boot starts from the saved copy. */
+const SAVED_DISK = 'apple-IIe-disk:';
+const DISK_SAVE_SECONDS = 20;
+let diskSaveTimer = null;
+let savingDisk = null;      // the disk path being kept, while it runs
+
+function savedDisk(disk) {
+    try {
+	const text = window.localStorage.getItem(SAVED_DISK + disk);
+	return text ? Uint8Array.from(atob(text), (c) => c.charCodeAt(0)) : null;
+    } catch (error) {
+	return null;
+    }
+}
+
+function keepDisk(frame, disk) {
+    // Ask the //e for drive 1's disk and store it. Resolves either way.
+    if (!frame || !frame.contentWindow || !frame.contentWindow.menuDisk) {
+	return Promise.resolve();
+    }
+    return frame.contentWindow.menuDisk.save().then((buffer) => {
+	const bytes = new Uint8Array(buffer);
+	let text = '';
+	for (let i = 0; i < bytes.length; i += 0x8000) {
+	    text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+	}
+	window.localStorage.setItem(SAVED_DISK + disk, btoa(text));
+    }).catch((error) => console.log('disk not saved:', error));
+}
+
+function bootDisk(disk, options = {}) {
     /* Hand the screen to a real Apple //e: apple2js (MIT, apple2js/) in a
      * frame, booting `disk` in drive 1 and showing it in green. The menu's
      * DOS is gone until the power switch brings it back. A disk that isn't
-     * there is an I/O ERROR. */
+     * there is an I/O ERROR. With options.save, the disk keeps its changes
+     * (see SAVED_DISK). */
     endProgram();
     const token = programToken;
     const url = new URL(disk, document.baseURI).href; // under /menu/ even at /
+    const saved = options.save ? savedDisk(disk) : null;
     working = true;
     readFromFloppy(60);
     fetch(url, { method: 'HEAD' }).then((response) => {
-	if (!response.ok) {
+	if (!response.ok && !saved) {
 	    throw new Error(disk + ': ' + response.status);
 	}
 	if (token !== programToken || !on) {
@@ -1083,8 +1170,23 @@ function bootDisk(disk) {
 	emulator = document.createElement('iframe');
 	emulator.className = 'monitor__emulator';
 	emulator.title = 'Apple //e';
+	// The disk to boot is named after the #. A saved copy is handed over as
+	// a link to it in this page, ending in the disk's own file name, which
+	// is how apple2js tells the format (.dsk, .po).
+	let bootFrom = url;
+	if (saved) {
+	    const link = URL.createObjectURL(new Blob([saved], { type: 'application/octet-stream' }));
+	    bootFrom = link + '#' + disk.split('/').pop();
+	    setTimeout(() => URL.revokeObjectURL(link), 60 * 1000); // read long before then
+	}
 	emulator.src = 'apple2js/apple2jse.html?mono_screen=true&gl_canvas=false' +
-	    (soundOn ? '' : '&muted') + '#' + url;
+	    (soundOn ? '' : '&muted') + '#' + bootFrom;
+	const frame = emulator;
+	if (options.save) {
+	    savingDisk = disk;
+	    clearInterval(diskSaveTimer);
+	    diskSaveTimer = setInterval(() => keepDisk(frame, disk), DISK_SAVE_SECONDS * 1000);
+	}
 	if (!touchMode) {
 	    // On a phone the keys come from the phone keyboard instead.
 	    emulator.addEventListener('load', () => emulator && emulator.focus());
@@ -1109,7 +1211,17 @@ function bootDisk(disk) {
 
 function stopEmulator() {
     if (emulator) {
-	emulator.remove();
+	const frame = emulator;
+	clearInterval(diskSaveTimer);
+	diskSaveTimer = null;
+	if (savingDisk) {
+	    // Keep the disk's last changes, then let the //e go.
+	    frame.style.display = 'none';
+	    keepDisk(frame, savingDisk).finally(() => frame.remove());
+	    savingDisk = null;
+	} else {
+	    frame.remove();
+	}
 	emulator = null;
 	document.body.classList.remove('emulating');
 	if (phoneInput) {
@@ -1185,7 +1297,7 @@ function processCommand(command) {
 	    startProgram(name, args);
 	}
 	if (action == "boot") {
-	    bootDisk(commands[resolved]["payload"][0]);
+	    bootDisk(commands[resolved]["payload"][0], { save: Boolean(commands[resolved]["save"]) });
 	}
 	if (action == "redirect") {
 	    showArrayData([' ', 'CONFIRMED', ' ', 'You will be redirected in ' + REDIRECT_SECONDS.toString() + ' seconds.',

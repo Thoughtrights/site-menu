@@ -328,6 +328,7 @@
 	"action": "boot",
 	"type": "A",
 	"sectors": 48,
+	"save": true,
 	"payload": ["assets/disks/eamon-001-main-hall.dsk"]
     },
     "BRUN EAMON" : {
@@ -358,11 +359,17 @@
 	"action": "alias",
 	"payload": ["BRUN KARATEKA"]
     },
-    "RUN WARDIAL" : {
+    "RUN DEMONDIAL" : {
 	"action": "program",
 	"type": "A",
 	"sectors": 9,
-	"payload": ["wardial"]
+	"payload": ["demondial"]
+    },
+    "RUN DIALUP" : {
+	"action": "program",
+	"type": "A",
+	"sectors": 11,
+	"payload": ["dialup"]
     },
     "PR#2" : {
 	"action": "program",

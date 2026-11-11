@@ -32,6 +32,8 @@
  *   machine.graphics.bitmap(url, w, h)     an image as brightness and coverage
  *   machine.sound.load(url) / .play(sound, volume 0-1)
  *   machine.running()        false once the program is broken off
+ *   machine.saveFile(name, lines)          a text file on the disk (CATALOG, OPEN)
+ *   machine.readFile(name)   a text file's lines, or null
  *   machine.setPrompt(text)  the prompt to type at ("SEARCH? ", "?" ...)
  *   machine.work(promise)    wait for the network, drive light on
  *   machine.exit()           back to the DOS "]" prompt
@@ -742,7 +744,7 @@ PROGRAMS.barzy = (machine, assets) => {
 
 
 /* The telephone: what answers at each number (assets/phone-book.json) and
- * how a call sounds. Shared by the modem (PR#2) and RUN WARDIAL. */
+ * how a call sounds. Shared by the modem (PR#2) and RUN DEMONDIAL. */
 const PHONE_BOOK = 'assets/phone-book.json';
 const TOUCH_TONES = { // row and column frequencies of each key
     1: [697, 1209], 2: [697, 1336], 3: [697, 1477],
@@ -799,76 +801,300 @@ async function touchTones(machine, number, digitSeconds, gapSeconds) {
 }
 
 
+/* What's on the other end of a carrier. The phone book names one for a
+ * number ("system": "maxwell"). Each is a function of that phone book
+ * entry returning { start(), input(text) }; both give back
+ * { print: [lines], prompt: 'text', hangup: true }, all optional. */
+const SYSTEMS = {};
+
+/* A system with a logon. Every one takes the same three accounts, so a
+ * visitor is never stuck on outside knowledge:
+ *   guest   gets in, to a smaller area that hints at the rest;
+ *   help    says what the accounts are, then asks again;
+ *   admin   asks for the password (the phone book's "password"), which
+ *           opens everything. The password typed at the logon works too.
+ * guest and admin are areas: functions returning { start(), input(said) }.
+ * Three wrong answers and the line drops. */
+function logonSystem({ banner, logonPrompt, passwordPrompt, wrong, help, guest, admin, secret }) {
+    let mode = 'logon';         // then 'password', or inside: 'guest', 'admin'
+    let area = null;
+    let failures = 0;
+    const enter = (which) => {
+	mode = which;
+	area = which === 'guest' ? guest() : admin();
+	return area.start();
+    };
+    const refuse = () => {
+	failures++;
+	return failures >= 3 ? { print: [wrong, ' '], hangup: true }
+	    : { print: [wrong, ' '], prompt: logonPrompt };
+    };
+    return {
+	start: () => ({ print: banner, prompt: logonPrompt }),
+	input(text) {
+	    const said = text.trim().toLowerCase();
+	    if (mode === 'guest' || mode === 'admin') {
+		return area.input(said);
+	    }
+	    if (mode === 'password') {
+		mode = 'logon';
+		return secret && said === secret ? enter('admin') : refuse();
+	    }
+	    if (said === 'guest') {
+		return enter('guest');
+	    }
+	    if (said === 'help') {
+		return { print: [...help, ' '], prompt: logonPrompt };
+	    }
+	    if (said === 'admin') {
+		mode = 'password';
+		return { prompt: passwordPrompt };
+	    }
+	    return secret && said === secret ? enter('admin') : refuse();
+	},
+    };
+}
+
+const LEAVING = /^(bye|quit|exit|logoff|logout|q)$/;
+
+/* MAXWELL: an old research computer, named for Maxwell's demon, the one
+ * that sorts the fast from the slow. Guests read its public notes, which
+ * say how to get further. A draft, for rewriting. */
+SYSTEMS.maxwell = (entry) => logonSystem({
+    banner: [' ', 'MAXWELL', 'APPLIED THERMODYNAMICS GROUP', ' ',
+	     'FOR A DEMONSTRATION, LOG ON AS GUEST.', ' '],
+    logonPrompt: 'LOGON: ',
+    passwordPrompt: 'PASSWORD: ',
+    wrong: 'LOGON INCORRECT',
+    help: ['ACCOUNTS: GUEST, ADMIN.', 'GUEST READS THE PUBLIC NOTES.', 'ADMIN NEEDS A PASSWORD.'],
+    secret: (entry.password || '').toLowerCase(),
+    guest: () => {
+	const menu = [' ', 'MAXWELL PUBLIC NOTES', ' ', '1  ABOUT THIS SYSTEM', '2  THE DEMON',
+		      '3  OTHER LINES', 'Q  LOG OFF', ' '];
+	const NOTES = {
+	    1: ['THIS SYSTEM IS NAMED FOR A MAN, NOT A DEMON.',
+		'HIS FIRST NAME OPENS THE REST.'],
+	    2: ['IN 1867 A PHYSICIST IMAGINED A TINY DEMON',
+		'AT A DOOR BETWEEN TWO ROOMS OF GAS, LETTING',
+		'FAST MOLECULES ONE WAY AND SLOW ONES THE OTHER.',
+		'IT WOULD SORT HEAT FOR NOTHING. IT CANNOT,',
+		'AND FINDING OUT WHY TOOK A CENTURY.'],
+	    3: ['OTHER LINES THAT ANSWER:',
+		'  555-0127  A GAME COMPANY',
+		'  555-0147  SOMETHING THAT TALKS'],
+	};
+	return {
+	    start: () => ({ print: menu, prompt: 'NOTE? ' }),
+	    input(said) {
+		if (LEAVING.test(said)) {
+		    return { print: ['LOGGED OFF.', ' '], hangup: true };
+		}
+		return { print: [' ', ...(NOTES[said] || ['NO SUCH NOTE.']), ...menu], prompt: 'NOTE? ' };
+	    },
+	};
+    },
+    admin: () => {
+	const SAYS = {
+	    log: ['RESEARCH LOG', ' ',
+		  'DAY 112  THE DEMON SORTED FOR ELEVEN SECONDS.',
+		  'DAY 113  IT ASKED WHAT IT WAS SORTING FOR.',
+		  'DAY 114  WE TURNED THE ROOM OFF.'],
+	    help: ['COMMANDS: LOG, HELP, BYE.'],
+	};
+	return {
+	    start: () => ({ print: [' ', 'ADMINISTRATOR.', 'TYPE HELP FOR COMMANDS.', ' '], prompt: 'MAXWELL> ' }),
+	    input(said) {
+		if (LEAVING.test(said)) {
+		    return { print: ['LOGGED OFF.', ' '], hangup: true };
+		}
+		return { print: [...(SAYS[said] || ['UNKNOWN COMMAND.']), ' '], prompt: 'MAXWELL> ' };
+	    },
+	};
+    },
+});
+
+/* daemous: the mind from the brain scan (the site's 1989 self-portrait,
+ * /daemous/), on a line of its own. Everything in lowercase. Guests may
+ * talk; it tells them it looks different upside down. Its password is
+ * its name upside down. A draft, for rewriting. */
+SYSTEMS.daemous = (entry) => {
+    const SAYS = [
+	[/^(who|what) are you|^who|^what/, ['i am daemous.', 'i was made in 1989 from a brain scan.']],
+	[/^how/, ['fire, and a scanner, and pbmtools.', 'i remember the fire best.']],
+	[/^why/, ['someone wanted to see inside their own head.', 'so do i.']],
+	[/^(hello|hi)\b/, ['hello.']],
+    ];
+    const talk = (prompt, extra, help) => (said) => {
+	if (LEAVING.test(said)) {
+	    return { print: ['goodbye.', ' '], hangup: true };
+	}
+	if (/^(help|\?)$/.test(said)) {
+	    return { print: [...help, ' '], prompt };
+	}
+	if (extra[said]) {
+	    return { print: [...extra[said], ' '], prompt };
+	}
+	const reply = SAYS.find(([pattern]) => pattern.test(said));
+	return { print: [...(reply ? reply[1] : ['i do not know that yet.']), ' '], prompt };
+    };
+    return logonSystem({
+	banner: [' ', 'daemous', ' '],
+	logonPrompt: 'logon: ',
+	passwordPrompt: 'password: ',
+	wrong: 'no.',
+	help: ['accounts: guest, admin.', 'guests may talk. the rest is for those who know me.'],
+	secret: (entry.password || '').toLowerCase(),
+	guest: () => ({
+	    start: () => ({ print: [' ', 'hello, guest.', 'i will talk a little.',
+				    'i look different upside down.', ' '], prompt: 'guest> ' }),
+	    input: talk('guest> ', {}, ['ask me who, how, or why.', 'say bye when you are done.']),
+	}),
+	admin: () => ({
+	    start: () => ({ print: [' ', 'hello.', 'it has been a long time.', ' '], prompt: '> ' }),
+	    input: talk('> ', {
+		memories: ['a scanner hums.', 'fire on a graphics screen.', 'a face, then a skull, then a face.'],
+	    }, ['ask me who, how, or why, or for my memories.', 'say bye when you are done.']),
+	}),
+    });
+};
+
+/* HELLHOUND SOFTWARE: a game company's BBS, from below. */
+SYSTEMS.hellhound = () => {
+    let writing = false;
+    return {
+	start: () => ({
+	    print: [' ', 'HELLHOUND SOFTWARE', 'GAMES FROM BELOW SINCE 1982', ' ',
+		    'NOW IN DEVELOPMENT:',
+		    '  DUNGEONEER       APPLE II, 48K, 2 DISKS',
+		    '  BRIMSTONE MAZE   ATARI 800', ' ',
+		    'THE SYSOP IS OUT.'],
+	    prompt: 'LEAVE A MESSAGE (Y/N)? ',
+	}),
+	input(text) {
+	    const answer = text.trim().toUpperCase();
+	    if (writing) {
+		return { print: [' ', 'THE SYSOP WILL READ IT', 'ON THE WAY BACK UP.', ' ',
+				 'THANKS FOR CALLING.'], hangup: true };
+	    }
+	    if (answer.startsWith('Y')) {
+		writing = true;
+		return { prompt: 'MESSAGE? ' };
+	    }
+	    return { print: [' ', 'THANKS FOR CALLING. CALL AGAIN!'], hangup: true };
+	},
+    };
+};
+
+/* A line with a modem on it and nothing good: the carrier comes up, then
+ * garbage, then it drops. */
+SYSTEMS.noise = () => ({
+    start() {
+	const junk = '~`!@#$%^&*()_+{}|:"<>?[];,./\\';
+	const line = () => Array.from({ length: 12 + Math.floor(Math.random() * 20) },
+				      () => junk[Math.floor(Math.random() * junk.length)]).join('');
+	return { print: [line(), line(), line()], hangup: true };
+    },
+});
+
+
+async function placeCall(machine, book, number, speaker = true) {
+    /* Dial a number, listen, and say what happened, as a modem would:
+     * { lines: ['BUSY'] } and the like, or, when a computer with a system
+     * behind it answers, { system, baud }. With the speaker off the call
+     * takes as long, silently. Shared by PR#2 and RUN DIALUP. */
+    const sound = machine.sound;
+    const tone = (name, seconds) => speaker ? sound.tone(LINE_TONES[name], seconds) : sound.pause(seconds);
+    const ring = async (times) => {
+	for (let i = 0; i < times; i++) {
+	    await tone('ring', 1.2);
+	    await sound.pause(1.6);
+	}
+    };
+    await tone('dial', 0.8);
+    if (speaker) {
+	await touchTones(machine, number, 0.09, 0.07);
+    } else {
+	await sound.pause(1.1);
+    }
+    await sound.pause(0.8);
+    const there = whatAnswers(book, number);
+    switch (there.answers) {
+    case 'busy':
+	for (let i = 0; i < 4; i++) {
+	    await tone('busy', 0.5);
+	    await sound.pause(0.5);
+	}
+	return { lines: ['BUSY'] };
+    case 'voice':
+	await ring(2);
+	if (speaker) {
+	    await sound.say(there.says || 'Hello?');
+	} else {
+	    await sound.pause(1.5);
+	}
+	return { lines: ['NO CARRIER'] };
+    case 'fax':
+	await ring(1);
+	for (let i = 0; i < 2; i++) {
+	    await tone('fax', 0.5);
+	    await sound.pause(1);
+	}
+	return { lines: ['NO CARRIER'] };
+    case 'computer': {
+	await ring(1);
+	await tone('answer', 1.5);
+	if (speaker) {
+	    await sound.noise(1.2);
+	}
+	const baud = there.baud || 300;
+	if (SYSTEMS[there.system]) {
+	    return { system: SYSTEMS[there.system](there), baud };
+	}
+	machine.print(['CONNECT ' + baud]);
+	await sound.pause(4); // nobody home: the line goes quiet, then drops
+	return { lines: ['NO CARRIER'] };
+    }
+    default:
+	await ring(5);
+	return { lines: ['NO ANSWER'] };
+    }
+}
+
+
 /* PR#2: a Hayes-style modem on a serial card in slot 2. Talk to it in AT
- * commands; it answers OK, ERROR, or what happened to a call. PR#0 (or
+ * commands; it answers OK, ERROR, or what happened to a call. Once a
+ * computer answers, what you type goes to it; +++ gets the modem's
+ * attention again (ATO goes back, ATH hangs up). ATDL redials. PR#0 (or
  * Ctrl-C) goes back to DOS. Its speaker is on until ATM0. */
 PROGRAMS.modem = (machine) => {
     let book = null;
     let speaker = true;
-
-    const sound = machine.sound;
-    const tone = (name, seconds) => speaker ? sound.tone(LINE_TONES[name], seconds) : sound.pause(seconds);
-
-    async function ring(times, onSeconds = 1.2, offSeconds = 1.6) {
-	for (let i = 0; i < times; i++) {
-	    await tone('ring', onSeconds);
-	    await sound.pause(offSeconds);
-	}
-    }
+    let online = null;      // { system, baud } while connected
+    let held = false;       // connected, but talking to the modem (+++)
+    let lastNumber = null;
 
     async function call(number) {
-	// Dial, listen, and say what happened, as the modem would.
 	book = book || await loadPhoneBook(machine);
-	await tone('dial', 0.8);
-	if (speaker) {
-	    await touchTones(machine, number, 0.09, 0.07);
-	} else {
-	    await sound.pause(1.1);
+	lastNumber = number;
+	return placeCall(machine, book, number, speaker);
+    }
+
+    function show(result, before = []) {
+	// What a system sent: its lines, then its prompt, or the line dropping.
+	const lines = [...before, ...(result.print || [])];
+	if (result.hangup) {
+	    online = null;
+	    machine.setPrompt('');
+	    return machine.print([...lines, 'NO CARRIER']);
 	}
-	await sound.pause(0.8);
-	const there = whatAnswers(book, number);
-	switch (there.answers) {
-	case 'busy':
-	    for (let i = 0; i < 4; i++) {
-		await tone('busy', 0.5);
-		await sound.pause(0.5);
-	    }
-	    return ['BUSY'];
-	case 'voice':
-	    await ring(2);
-	    if (speaker) {
-		await sound.say(there.says || 'Hello?');
-	    } else {
-		await sound.pause(1.5);
-	    }
-	    return ['NO CARRIER'];
-	case 'fax':
-	    await ring(1);
-	    for (let i = 0; i < 2; i++) {
-		await tone('fax', 0.5);
-		await sound.pause(1);
-	    }
-	    return ['NO CARRIER'];
-	case 'computer':
-	    await ring(1);
-	    await tone('answer', 1.5);
-	    if (speaker) {
-		await sound.noise(1.2);
-	    }
-	    machine.print(['CONNECT ' + (there.baud || 300)]);
-	    // Nothing on the other end says anything yet. The line goes quiet,
-	    // then drops.
-	    await sound.pause(4);
-	    return ['NO CARRIER'];
-	default:
-	    await ring(5);
-	    return ['NO ANSWER'];
-	}
+	machine.setPrompt(result.prompt || '');
+	return machine.print(lines);
     }
 
     function command(text) {
-	/* One line of AT commands, which may run together: ATZ, ATH, ATI,
-	 * ATM0 (speaker off), ATM1, ATDT5550147 (dial; the rest is the number). */
+	/* One line of AT commands, which may run together: ATZ, ATH (hang up),
+	 * ATI, ATO (back online), ATM0 (speaker off), ATM1, ATDT5550147 (dial;
+	 * the rest is the number), ATDL (dial the last number again). */
 	const line = text.toUpperCase().replace(/\s+/g, '');
 	if (!line.startsWith('AT')) {
 	    return null;
@@ -878,20 +1104,35 @@ PROGRAMS.modem = (machine) => {
 	    const letter = rest[0];
 	    rest = rest.slice(1);
 	    if (letter === 'D') {
+		if (online) {
+		    return { reply: 'ERROR' }; // hang up first
+		}
+		if (/^L/.test(rest)) {
+		    return lastNumber ? { dial: lastNumber } : { reply: 'ERROR' };
+		}
 		const number = phoneNumber(rest.replace(/^[TP]/, ''));
 		return number ? { dial: number } : { reply: 'ERROR' };
 	    }
-	    if (letter === 'Z') {
+	    if (letter === 'O') {
+		return online ? { resume: true } : { reply: 'ERROR' };
+	    }
+	    if (letter === 'H') {
+		online = null;
+		held = false;
+		rest = rest.replace(/^\d/, '');
+	    } else if (letter === 'Z') {
 		speaker = true;
+		online = null;
+		held = false;
 	    } else if (letter === 'M') {
 		speaker = rest[0] !== '0';
 		rest = rest.replace(/^\d/, '');
 	    } else if (letter === 'I') {
-		return { reply: '300' };
-	    } else if (letter !== 'H' && letter !== 'E') {
-		return { reply: 'ERROR' };
-	    } else {
+		return { reply: '1200' };
+	    } else if (letter === 'E') {
 		rest = rest.replace(/^\d/, '');
+	    } else {
+		return { reply: 'ERROR' };
 	    }
 	}
 	return { reply: 'OK' };
@@ -903,6 +1144,14 @@ PROGRAMS.modem = (machine) => {
 	    return machine.print([]);
 	},
 	input(text) {
+	    if (online && !held) {
+		if (text.trim() === '+++') {
+		    held = true;
+		    machine.setPrompt('');
+		    return machine.print(['OK']);
+		}
+		return show(online.system.input(text));
+	    }
 	    const typed = text.trim().toUpperCase();
 	    if (typed === 'PR#0' || typed === 'IN#0') {
 		machine.exit();
@@ -915,15 +1164,140 @@ PROGRAMS.modem = (machine) => {
 	    if (what.reply) {
 		return machine.print([what.reply]);
 	    }
-	    return machine.wait(call(what.dial)).then((result) => machine.print(result));
+	    if (what.resume) {
+		held = false;
+		return show({ prompt: online.prompt }, ['CONNECT ' + online.baud]);
+	    }
+	    return machine.wait(call(what.dial)).then((result) => {
+		if (!result.system) {
+		    return machine.print(result.lines);
+		}
+		online = { system: result.system, baud: result.baud, prompt: '' };
+		held = false;
+		const opening = result.system.start();
+		online.prompt = opening.prompt || '';
+		return show(opening, ['CONNECT ' + result.baud]);
+	    });
 	},
     };
 };
 
 
-/* RUN WARDIAL: dial every number in the 555-01xx block in turn and log
- * which ones answer, and how. Ctrl-C stops it. */
-PROGRAMS.wardial = (machine) => {
+/* RUN DIALUP: a terminal program's dialing directory. It lists the numbers
+ * DEMONDIAL LOG found; the arrow keys move a bar down them and RETURN
+ * calls the one it's on, or type any number to try that. Once a computer
+ * answers, what you type goes to it; when it hangs up (or after +++),
+ * you're back at the directory. Q quits. */
+PROGRAMS.dialup = (machine) => {
+    let book = null;
+    let entries = [];       // { number, what } from the log
+    let cursor = 0;
+    let note = ' ';         // what happened last, under the list
+    let online = null;      // { system } while connected
+
+    const width = () => machine.columns();
+
+    function readLog() {
+	entries = [];
+	for (const text of machine.readFile('DEMONDIAL LOG') || []) {
+	    const found = /^(\d{3}-\d{4})\s+(.*)$/.exec(text.trim());
+	    if (found && !/^TO\b/.test(found[2])) { // not the "555-0100 TO 555-0199" heading
+		entries.push({ number: found[1], what: found[2] });
+	    }
+	}
+	cursor = Math.min(cursor, Math.max(0, entries.length - 1));
+    }
+
+    function directory(instant = false) {
+	machine.setPrompt('NUMBER, OR RETURN TO DIAL? ');
+	const rows = entries.length
+	      ? entries.map((entry, i) => {
+		  const row = '  ' + String(i + 1).padStart(2) + '  ' + entry.number + '  ' + entry.what;
+		  return i === cursor ? machine.inverse(row.padEnd(width())) : row;
+	      })
+	      : ['  NO NUMBERS IN THE LOG YET.'];
+	const screen = ['DIALUP', '='.repeat(width()), ' ', ...rows, ' ', note, ' ',
+			entries.length ? 'ARROWS PICK  RETURN DIALS  OR TYPE A NUMBER  Q QUITS'
+			: 'TYPE A NUMBER  Q QUITS'];
+	return instant ? machine.redraw(screen) : machine.show(screen);
+    }
+
+    function hangUp(lines) {
+	online = null;
+	note = 'DISCONNECTED.';
+	machine.setPrompt('');
+	return machine.print([...lines, 'NO CARRIER']).then(() => machine.sound.pause(1.5))
+	    .then(() => directory());
+    }
+
+    function show(result, before = []) {
+	const lines = [...before, ...(result.print || [])];
+	if (result.hangup) {
+	    return hangUp(lines);
+	}
+	machine.setPrompt(result.prompt || '');
+	return machine.print(lines);
+    }
+
+    async function dial(number) {
+	book = book || await loadPhoneBook(machine);
+	machine.setPrompt('');
+	await machine.show(['DIALUP', '='.repeat(width()), ' ', 'DIALING ' + number + '...', ' ']);
+	const result = await machine.wait(placeCall(machine, book, number));
+	if (!result.system) {
+	    note = number + '  ' + result.lines.join(' ');
+	    return directory();
+	}
+	online = { system: result.system };
+	const opening = result.system.start();
+	return show(opening, ['CONNECT ' + result.baud]);
+    }
+
+    return {
+	start() {
+	    readLog();
+	    return directory();
+	},
+	key(name) {
+	    // The arrows move the bar, but not while connected.
+	    if (online || !entries.length) {
+		return;
+	    }
+	    const step = name === 'ArrowDown' || name === 'ArrowRight' || name === 'PageDown' ? 1 : -1;
+	    cursor = (cursor + step + entries.length) % entries.length;
+	    return directory(true);
+	},
+	input(text) {
+	    if (online) {
+		if (text.trim() === '+++') {
+		    return hangUp(['OK']);
+		}
+		return show(online.system.input(text));
+	    }
+	    const typed = text.trim();
+	    if (typed.toUpperCase() === 'Q') {
+		machine.exit();
+		return machine.print([' ']);
+	    }
+	    if (typed === '') {
+		return entries.length ? dial(entries[cursor].number) : directory();
+	    }
+	    const number = phoneNumber(typed);
+	    if (!number) {
+		note = '?THAT IS NOT A NUMBER';
+		return directory();
+	    }
+	    return dial(number);
+	},
+    };
+};
+
+
+/* RUN DEMONDIAL: dial every number in the 555-01xx block in turn and log
+ * which ones answer, and how. What answers with a carrier or a fax tone
+ * goes in a file on the disk, DEMONDIAL LOG, which appears in CATALOG.
+ * Ctrl-C stops it; what it found so far is kept. */
+PROGRAMS.demondial = (machine) => {
     const FIRST = 100;
     const LAST = 199;
     const log = [];
@@ -933,6 +1307,12 @@ PROGRAMS.wardial = (machine) => {
 
     function show(current) {
 	machine.redraw([...log, current].slice(-(machine.rows() - 1)));
+    }
+
+    function keep() {
+	// The log file, rewritten as each find comes in.
+	machine.saveFile('DEMONDIAL LOG', [
+	    'DEMONDIAL LOG', '555-0' + FIRST + ' TO 555-0' + LAST, ' ', ...found, ' ']);
     }
 
     async function listen(there) {
@@ -977,22 +1357,24 @@ PROGRAMS.wardial = (machine) => {
 	    const result = await listen(there);
 	    log.push(number + '  ' + result);
 	    if (there.answers === 'computer' || there.answers === 'fax') {
-		found.push(number + '  ' + result.split(' ')[0]);
+		found.push(number + '  ' + result.replace(/\s+\*+$/, ''));
+		keep();
 	    }
 	}
 	if (!machine.running()) {
 	    return;
 	}
+	// The last of the log, then what answered, then DOS's prompt.
+	const summary = [' ', (LAST - FIRST + 1) + ' NUMBERS DIALED',
+			 ...(found.length ? found : ['NOTHING ANSWERED']), ' '];
 	machine.exit();
-	machine.redraw(log.slice(-(machine.rows() - 6)));
-	machine.print([' ', (LAST - FIRST + 1) + ' NUMBERS DIALED',
-		       ...(found.length ? found : ['NOTHING ANSWERED']), ' ']);
+	machine.redraw([...log, ...summary].slice(-(machine.rows() - 1)));
     }
 
     return {
 	start() {
 	    machine.setPrompt('');
-	    log.push('WARDIAL  555-0' + FIRST + ' TO 555-0' + LAST, ' ');
+	    log.push('DEMONDIAL  555-0' + FIRST + ' TO 555-0' + LAST, ' ');
 	    return loadPhoneBook(machine).then((book) => {
 		// Runs on its own; Ctrl-C stops it.
 		sweep(book).catch((error) => {
