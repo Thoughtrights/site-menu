@@ -76,7 +76,8 @@ let working = false;      // the program is waiting on the network
 
 // Timers that belong to the running machine. Power off cancels them all.
 let output = null;        // the listing being printed, if any
-let resumeOutput = null;  // a CATALOG stopped at a full screen: call to go on
+let resumeOutput = null;  // a listing stopped at a full screen: call to go on
+let resumeKeys = null;    // the keys that go on (event.key), or null for any
 let graphicsCanvas = null;   // the graphics layer, once a program has drawn
 let graphicsGeneration = 0;  // bumped by clearGraphics(), so a late picture isn't drawn
 let redirectTimer = null;
@@ -427,8 +428,13 @@ function setUpPhone() {
 	    return;
 	}
 	if (resumeOutput && on) {
-	    phoneInput.value = ''; // any key shows the next screen of CATALOG
-	    resumeOutput();
+	    // The next screen: any key for CATALOG; a space for a text file
+	    // (RETURN works too, through the form below).
+	    const typed = phoneInput.value;
+	    phoneInput.value = '';
+	    if (!resumeKeys || typed.includes(' ')) {
+		resumeOutput();
+	    }
 	    return;
 	}
 	if (program && program.allKeys && acceptingInput()) {
@@ -835,10 +841,13 @@ document.addEventListener('keydown', (event) => {
     }
 
     if (resumeOutput && on) {
-	// A full screen of CATALOG: any key shows the next one.
+	// A full screen: any key shows the next (CATALOG), or only the keys
+	// the listing named (RETURN or space, for a text file).
 	if (!['Shift', 'Control', 'CapsLock'].includes(event.key)) {
 	    event.preventDefault();
-	    resumeOutput();
+	    if (!resumeKeys || resumeKeys.includes(event.key)) {
+		resumeOutput();
+	    }
 	}
 	return;
     }
@@ -1286,7 +1295,13 @@ function processCommand(command) {
     if (["print", "redirect", "catalog", "program", "boot"].includes(action)) {
 	syntaxErrorCounter = 0;
 	if (action == "print") {
-	    showArrayData(commands[resolved]["payload"]);
+	    if (commands[resolved]["type"] === "T") {
+		// A text file: a screenful at a time, RETURN or space for more.
+		showArrayData(commands[resolved]["payload"], MAX_ROWS - 1, OUTPUT_SPEED,
+			      { keys: ['Enter', ' '], marker: true });
+	    } else {
+		showArrayData(commands[resolved]["payload"]);
+	    }
 	}
 	if (action == "catalog") {
 	    // A screenful at a time, with "]CATALOG" still at the top.
@@ -1807,17 +1822,26 @@ function cancelOutput() {
 	clearInterval(output);
 	output = null;
     }
+    if (resumeOutput && lines[lines.length - 1] === MORE) {
+	lines.pop(); // broken off while waiting for the next page
+	line = lines.length - 1;
+    }
     resumeOutput = null;
+    resumeKeys = null;
 }
 
 function showData(inputData) {
     return showArrayData(inputData.split('\n'));
 }
 
-function showArrayData(dataLines, pageRows = 0, speed = OUTPUT_SPEED) {
+// Shown in inverse at the bottom while a text file waits for its next page.
+const MORE = '\u0001MORE';
+
+function showArrayData(dataLines, pageRows = 0, speed = OUTPUT_SPEED, { keys = null, marker = false } = {}) {
     /* Print lines one at a time, then the prompt. With pageRows, stop
-     * after that many screen rows until a key is pressed, as DOS 3.3's
-     * CATALOG did: no message, just no prompt yet. */
+     * after that many screen rows until a key is pressed: any key, as DOS
+     * 3.3's CATALOG did (no message, just no prompt yet), or only `keys`
+     * (event.key names), with MORE at the bottom when `marker` is set. */
     const tmpDataLines = dataLines.map(toScreenText); // copy JSON array values not just a new reference
     let rowsShown = 0;
 
@@ -1836,8 +1860,19 @@ function showArrayData(dataLines, pageRows = 0, speed = OUTPUT_SPEED) {
 	    if (pageRows && rowsShown + screenRows(tmpDataLines[0]) > pageRows) {
 		cancelOutput();
 		stopFloppy();
+		if (marker) {
+		    lines.push(MORE);
+		    line++;
+		    render();
+		}
+		resumeKeys = keys;
 		resumeOutput = () => {
 		    resumeOutput = null;
+		    resumeKeys = null;
+		    if (lines[lines.length - 1] === MORE) {
+			lines.pop();
+			line = lines.length - 1;
+		    }
 		    rowsShown = 0;
 		    readFromFloppy(5);
 		    output = setInterval(printNext, speed);
