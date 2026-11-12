@@ -5,6 +5,7 @@
 	"not listed rings out, is busy, or a person answers, the same every time.",
 	"answers: computer (a carrier: CONNECT at baud), fax, busy, voice (says:",
 	"spoken). A computer's system is in SYSTEMS in js/apple-IIe-programs.js.",
+	"A gopher hole's address may differ by environment: {local, uat, prod}.",
 	"Nobody is told these numbers; they turn up on the disk, the BBS, gopher."
     ],
     "555-0105": { "answers": "voice", "says": "You again? Stop calling this number." },
@@ -12,7 +13,9 @@
     "555-0118": { "answers": "busy" },
     "555-0127": { "answers": "computer", "baud": 1200, "system": "hellhound" },
     "555-0130": { "answers": "computer", "baud": 2400, "system": "gopher", "name": "DUNGEONEER",
-		  "hole": "gopher://localhost:7070/" },
+		  "hole": { "local": "gopher://localhost:7070/1/dungeoneer",
+			    "uat": "gopher://gopher.thoughtrights.com:7070/1/dungeoneer",
+			    "prod": "gopher://gopher.thoughtrights.com/1/dungeoneer" } },
     "555-0139": { "answers": "computer", "baud": 300, "system": "noise" },
     "555-0147": { "answers": "computer", "baud": 300, "system": "daemous", "password": "snowaep" },
     "555-0158": { "answers": "computer", "baud": 300, "system": "maxwell", "password": "james" },

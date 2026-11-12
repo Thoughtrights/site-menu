@@ -7,7 +7,7 @@ build step, no package to install, and no paid service behind it.
 | --- | --- | --- |
 | `html/` | The web root: `html/menu/` is served as `/menu/` | Yes |
 | `html/menu/proxy/gopher.cgi` | The `BRUN GOPHER` proxy (Python 3, standard library) | Yes, if you want GOPHER |
-| `gopher/` | The site index as a gopher hole, for `gopher://thoughtrights.com/` | Yes, if you run a gopher server |
+| `gopher/` | The top of the gopher hole, `gopher://gopher.thoughtrights.com/`: Dungeoneer and gopherspace | Yes, if you run a gopher server |
 | `tools/gopher-server.py` | The gopher server for `gopher/` (Python 3.8+, standard library) | Yes, beside `gopher/` |
 | `tests/` | Offline tests: the proxy, the gopher server, the catalog and its files, the deploy script | No |
 | `deploy/` | `deploy.sh uat\|prod`, the gopher server's systemd units, and how to use them ([deploy/README.md](deploy/README.md)) | No |
@@ -128,7 +128,7 @@ Both are environment variables, set with `SetEnv` as above.
 | --- | --- | --- |
 | `GOPHER_ALLOWED_ORIGINS` | `https://www.thoughtrights.com https://thoughtrights.com` | Pages allowed to use the proxy, separated by spaces. Set it if the menu is served from another host name. |
 | `GOPHER_STATE_DIR` | `/tmp/site-menu-gopher` | Where the 10-minute page cache and the per-visitor rate counts are kept. |
-| `GOPHER_EXTRA_HOLES` | (none) | This site's own holes, which may be on another port or a private address: `host:port=Name`, comma-separated, such as `localhost:7070=Dungeoneer`. Only those exact pairs get past the public-address rule; they're listed first on `BRUN GOPHER`'s home menu, and the phone book's `"hole"` lines (DUNGEONEER, 555-0130) need them. The dev server sets `localhost:7070=Dungeoneer`. |
+| `GOPHER_EXTRA_HOLES` | (none) | This site's own holes, which may be on another port or a private address: `host:port=Name`, comma-separated, such as `gopher.thoughtrights.com:7070=thoughtrights.com`. Only those exact pairs get past the public-address rule; they're listed first on `BRUN GOPHER`'s home menu, and the phone book's `"hole"` lines (DUNGEONEER, 555-0130) need them when not on port 70. The dev server sets `localhost:7070=thoughtrights.com`; CI-CD-PLAN.md has prod's and uat's. |
 
 The limits are constants at the top of `gopher.cgi`:
 
@@ -183,10 +183,13 @@ Last, boot the IIe, type `BRUN GOPHER`, and pick an item.
   `10.x`, `192.168.x` and the EC2 metadata address `169.254.169.254`, so a
   visitor can't use it to reach anything on your network.
 
-## 3. Your own gopher server (`gopher://thoughtrights.com/`)
+## 3. Your own gopher server (`gopher://gopher.thoughtrights.com/`)
 
-`gopher/` is the site index as a gopher hole: a `gophermap` with every
-link from the HTML menu, and `cgi-bin/search`, a type 7 search over it.
+The hole is gopher-only: the web pages are on the web server already.
+`gopher/gophermap` is its top menu, which links Dungeoneer and a few holes
+elsewhere in gopherspace. Dungeoneer's section, `/dungeoneer`, is the
+character app's own folder, written by its deploy and shown here with
+`--mount` (deploy/dungeoneer-gopher.md says what that app writes).
 `tools/gopher-server.py` serves it: a small gopher server using Python's
 standard library alone (3.8 and up), because Ubuntu 20.04 doesn't package
 Gophernicus. This is separate from the proxy in step 2: the proxy lets the
@@ -199,7 +202,8 @@ pointed at the same folder with `-r` and given the host name with `-h`).
 
 ### What the server needs
 
-- `python3` (Ubuntu 20.04 has 3.8), for the server and the search script.
+- `python3` (Ubuntu 20.04 has 3.8), for the server and Dungeoneer's programs.
+- **DNS:** `gopher.thoughtrights.com` pointing at the EC2 host.
 - **Inbound** TCP port 70 (prod) and 7070 (uat) in the EC2 security group,
   from 0.0.0.0/0. The server listens on IPv4.
 
@@ -224,8 +228,10 @@ pointed at the same folder with `-r` and given the host name with `-h`).
    sudo systemctl enable --now site-menu-gopher site-menu-gopher-uat
    ```
 
-   Each unit names the build dir, the port, and the host name its menus
-   carry (`--host thoughtrights.com`; without it, links would carry the
+   Each unit names the build dir, the port, Dungeoneer's folder
+   (`--mount dungeoneer=/home/ubuntu/build/character/gopher`, or
+   `character-uat` for uat), and the host name its menus carry
+   (`--host gopher.thoughtrights.com`; without it, links would carry the
    machine's own EC2 name, which clients can't follow). The unprivileged
    user needs to get into `/home/ubuntu`: `ls -ld /home/ubuntu` should
    show `x` for others, as Ubuntu 20.04 sets it by default.
@@ -235,45 +241,50 @@ pointed at the same folder with `-r` and given the host name with `-h`).
 4. **Logs:** one line per request, `journalctl -u site-menu-gopher`.
    After a deploy that changes `gopher-server.py`, restart the unit
    (`sudo systemctl restart site-menu-gopher`); changes to the hole itself
-   need no restart.
+   need no restart, and neither do Dungeoneer's deploys. Until the
+   character app's first deploy, `/dungeoneer` answers "Not here."
 
-To try it locally:
+To try it locally, with a checkout of the character app beside this one:
 
 ```bash
-python3 tools/gopher-server.py --root gopher --host localhost --port 7071
+python3 tools/gopher-server.py --root gopher --mount dungeoneer=../character/gopher --host localhost --port 7070
 ```
 
 ```bash
-curl -s gopher://localhost:7071/1/
+curl -s gopher://localhost:7070/1/dungeoneer
 ```
+
+The dev server already lets the Apple's DUNGEONEER line (555-0130) reach
+`localhost:7070`.
 
 ### Check it
 
 From anywhere:
 
 ```bash
-printf '\r\n' | nc thoughtrights.com 70 | head
+printf '\r\n' | nc gopher.thoughtrights.com 70 | head
 ```
 
 ```bash
-printf '/cgi-bin/search\tvideo\r\n' | nc thoughtrights.com 70
+printf '/dungeoneer\r\n' | nc gopher.thoughtrights.com 70 | head
 ```
 
 The first should print the menu, starting with the line for the title
-(`ithoughtrights.com`, a tab, `TITLE`). The second should list Barzy and
-the other video links. Then try `BRUN GOPHER` and
-`G gopher://thoughtrights.com`.
+(`ithoughtrights.com`, a tab, `TITLE`). The second should print
+Dungeoneer's menu (or "Not here." before its first deploy). Then dial
+555-0130 on the Apple, and try `BRUN GOPHER` and
+`G gopher://gopher.thoughtrights.com`.
 
 ### Adding to it
 
 - **Links** are lines of `type`, name, tab, selector (and optionally
-  tab, host, tab, port). Lines with no tab are plain text. Web pages are
-  type `h` with a `URL:https://...` selector. `#` starts a comment and
-  `!` gives the menu a title (the format is Gophernicus's).
-- **Text** goes in as files (`0About this site`, a tab, `/about.txt`), which
-  suits the resume, the job post and anything else that is already text.
+  tab, host, tab, port). Lines with no tab are plain text. `#` starts a
+  comment and `!` gives the menu a title (the format is Gophernicus's).
+  Keep it to gopher: the web pages have the web server.
+- **Text** goes in as files (`0About this site`, a tab, `/about.txt`).
 - **Programs** go in `cgi-bin/`. A type 7 item sends what the visitor
-  typed in `QUERY_STRING`; whatever the script prints is the reply,
+  typed in `QUERY_STRING`, and `cgi-bin/name/more` passes `/more` in
+  `PATH_INFO`; whatever the script prints is the reply,
   either a menu (lines with tabs, ending in `.`) or plain text for a
   type 0 item. Treat that input as hostile.
 - To be added to Floodgap's list of new servers once it's up, write to

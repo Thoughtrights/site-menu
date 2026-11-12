@@ -14,7 +14,7 @@ Both stay. They suit different things:
 - **The BBS** is where the site's own content goes. A BBS can lay a screen
   out any way it likes: menus, doors, file areas, bulletins, a sysop. It is
   archaic and flexible, but isolated: nothing outside it links in or out.
-- **The gopher hole** (`gopher://thoughtrights.com/`) connects. It's part of
+- **The gopher hole** (`gopher://gopher.thoughtrights.com/`) connects. It's part of
   the gopherspace other servers still run, so it can link to them and they to
   it. Putting interfaces in a gopher hole (searches, small applications) is
   archaic enough to fit right in.
@@ -30,7 +30,7 @@ menu. Built; what's left:
 
 - [ ] Turn it on for the live site: one `DirectoryIndex` line in Apache, in
       "The Apple as the front page" in INSTALLATION.md. Needs your go-ahead.
-- [ ] Add `gopher://thoughtrights.com` to the line under the desk once the
+- [ ] Add `gopher://gopher.thoughtrights.com` to the line under the desk once the
       gopher server is live. (Browsers don't open gopher links themselves, so
       it's there to be seen and copied.)
 - [ ] Not on the disk yet, on purpose: the D&DBeyond integration (abandoned),
@@ -172,42 +172,49 @@ real one holds 560. Some entries aren't really disks at all.
 
 ## The gopher hole
 
-`gopher/` holds the site index as a gopher menu and a search, served by
-`tools/gopher-server.py`, a small standard-library gopher server written
-because Ubuntu 20.04 doesn't package Gophernicus (INSTALLATION.md section
-3). Tested locally, through the Apple too; not deployed.
+The hole is Dungeoneer's: `gopher/gophermap` is a short top menu linking
+`/dungeoneer` and a few other holes, and `/dungeoneer` is the character
+app's own `gopher/` folder, which that app writes (deploy/dungeoneer-gopher.md
+is its instructions). Served by `tools/gopher-server.py`, a small
+standard-library gopher server written because Ubuntu 20.04 doesn't package
+Gophernicus (INSTALLATION.md section 3). Tested locally; not deployed.
 
 - [x] **Dungeoneer's hole** (`~/src/character/gopher/`) is reachable from
       the Apple: dial 555-0130 (`DIALUP` or `PR#2`; Hellhound's BBS gives
       the number) for DUNGEONEER, or pick it from `BRUN GOPHER`'s home menu.
-      The proxy only reaches it when named in `GOPHER_EXTRA_HOLES`, and
-      leaves out profiles' DM-only parts. Tested against a stand-in hole;
+      Off port 70 the proxy reaches it only when named in
+      `GOPHER_EXTRA_HOLES`; it leaves out profiles' DM-only parts. Tested against a stand-in hole;
       the real one isn't public yet.
+- [x] Dungeoneer in the site's hole: `--mount dungeoneer=<folder>`, with
+      `PATH_INFO` for its programs; the units name the character app's
+      folders; 555-0130's address is per environment (local, uat, prod).
+- [ ] The character app writing its `gopher/` folder on deploy
+      (deploy/dungeoneer-gopher.md). Its work, in its repository.
 - [ ] A public name for the holes: `gopher.thoughtrights.com`, one DNS
-      record pointing at the EC2 host. Then the site's hole on port 70,
-      Dungeoneer's on another port (or its own name), and the phone book's
-      `"hole"` and the vhost's `GOPHER_EXTRA_HOLES` set to match.
+      record pointing at the EC2 host. The units and the phone book use it;
+      Each vhost names its hole in `GOPHER_EXTRA_HOLES` (CI-CD-PLAN.md).
 - [x] A gopher server that runs on Ubuntu 20.04: `tools/gopher-server.py`,
       with systemd units in `deploy/systemd/` and tests that run it.
 - [ ] Deploy it, twice: prod on port 70 and UAT on port 7070, each
-      serving its build's `gopher/` (CI-CD-PLAN.md). Needs your go-ahead.
+      serving its build's `gopher/` and Dungeoneer's folder
+      (CI-CD-PLAN.md). Needs your go-ahead.
 - [ ] The server itself: Ubuntu 20.04 left standard support in May 2025,
       and "20.04.1" suggests it hasn't had a full upgrade since 2020. Plan
       an upgrade (24.04 would also package Gophernicus).
-- [ ] Let `BRUN GOPHER` reach and list each environment's own hole: the
-      proxy only talks to port 70 today.
+- [x] Let `BRUN GOPHER` reach and list each environment's own hole:
+      `GOPHER_EXTRA_HOLES`, set in each vhost.
 - [ ] `BRUN GOPHER`: choosing a web link (type `h`) prints `FILE TYPE
       MISMATCH`. It should show the address and offer to open it (`http` and
       `https` only). The remote program protocol needs a way to ask the page
       to open a URL.
 - [ ] Check whether the gophermap's `!` title line prints twice through the
       proxy, as the proposals report.
-- [ ] Add our own hole to `BRUN GOPHER`'s home menu once it's live.
-- [ ] More interfaces in the hole, as gopher applications: the weather
-      forecast as text, the baseball cards as a searchable list, the
-      generators as type 7 searches.
-- [ ] Link out to other gopher holes worth visiting, so ours is part of
+- [x] Our own hole on `BRUN GOPHER`'s home menu, under THIS SITE, once
+      the vhost names it.
+- [x] Link out to other gopher holes (Floodgap, SDF), so ours is part of
       gopherspace rather than a dead end.
+- [ ] The hole stays Dungeoneer's and gopher-only: the web pages are on the
+      web server. Anything else added has to be gopher-native.
 
 ## Dial-up modem and the BBS
 

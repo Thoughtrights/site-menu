@@ -11,8 +11,12 @@ the hole needs, with the standard library alone (Python 3.8 and up):
   - URL: selectors (web links) as a small HTML page pointing at the URL;
   - text files, with CRLF line endings, dot-stuffing and a closing dot;
   - programs in cgi-bin/, run with QUERY_STRING (what was typed for a
-    type 7 search), SERVER_NAME, SERVER_PORT and DOCUMENT_ROOT, as
-    Gophernicus runs them.
+    type 7 search), PATH_INFO (the rest of the selector after the
+    program's name: cgi-bin/person/Elven/k3j9), SERVER_NAME, SERVER_PORT
+    and DOCUMENT_ROOT, as Gophernicus runs them;
+  - other folders as sections of the hole (--mount dungeoneer=FOLDER is
+    /dungeoneer), by the same rules, so another project can write its
+    own section (deploy/dungeoneer-gopher.md).
 
 It serves nothing outside the root, no hidden files, and no directory
 without a gophermap. Requests are one line, at most 1 KB; programs get
@@ -27,6 +31,7 @@ On the server, systemd runs it (deploy/systemd/): prod on port 70, uat on
 import argparse
 import html
 import os
+import re
 import socketserver
 import subprocess
 import sys
@@ -46,26 +51,43 @@ def crlf(text):
 
 
 class Hole:
-    """Answers one selector with the bytes to send back."""
+    """Answers one selector with the bytes to send back.
 
-    def __init__(self, root, host, port):
+    mounts: other folders shown as sections of the hole, {name: folder},
+    so /name/... is served from that folder by the same rules. Another
+    project can write its own section without touching this one."""
+
+    def __init__(self, root, host, port, mounts=None):
         self.root = os.path.realpath(root)
         self.host = host
         self.port = str(port)
+        self.mounts = {name: os.path.realpath(folder) for name, folder in (mounts or {}).items()}
 
     def info(self, text, selector=''):
         return 'i%s\t%s\t%s\t%s' % (text, selector, self.host, self.port)
 
     def resolve(self, selector):
-        """The file or directory a selector names, or None if it isn't one
-        we serve: outside the root, hidden, or missing."""
+        """What a selector names, or None if it isn't something we serve
+        (outside its folder, hidden, or missing): a dict with the path,
+        the folder it's in (the root or a mount), that folder's selector,
+        and for a program, what follows its name (PATH_INFO)."""
         parts = [part for part in selector.split('/') if part]
         if any(part.startswith('.') for part in parts):
             return None
-        path = os.path.realpath(os.path.join(self.root, *parts))
-        if path != self.root and not path.startswith(self.root + os.sep):
+        base, prefix = self.root, ''
+        if parts and parts[0] in self.mounts:
+            base, prefix = self.mounts[parts[0]], '/' + parts[0]
+            parts = parts[1:]
+        extra = []
+        if len(parts) > 2 and parts[0] == 'cgi-bin':
+            parts, extra = parts[:2], parts[2:]  # cgi-bin/person/Elven/k3j9
+        path = os.path.realpath(os.path.join(base, *parts))
+        if path != base and not path.startswith(base + os.sep):
             return None
-        return path if os.path.exists(path) else None
+        if not os.path.exists(path):
+            return None
+        return {'path': path, 'base': base, 'prefix': prefix,
+                'path_info': '/' + '/'.join(extra) if extra else ''}
 
     def menu(self, gophermap, directory):
         """A gophermap as a gopher menu."""
@@ -100,13 +122,14 @@ class Hole:
         stuffed = ['.' + line if line.startswith('.') else line for line in lines]
         return ('\r\n'.join(stuffed) + '\r\n.\r\n').encode('utf-8')
 
-    def program(self, path, query):
+    def program(self, path, query, base, path_info):
         env = {
             'PATH': os.environ.get('PATH', '/usr/bin:/bin'),
             'QUERY_STRING': query,
+            'PATH_INFO': path_info,
             'SERVER_NAME': self.host,
             'SERVER_PORT': self.port,
-            'DOCUMENT_ROOT': self.root,
+            'DOCUMENT_ROOT': base,
         }
         try:
             result = subprocess.run([path], env=env, cwd=os.path.dirname(path), timeout=PROGRAM_SECONDS,
@@ -129,20 +152,22 @@ class Hole:
         selector, _, query = request.partition('\t')
         if selector.startswith('URL:'):
             return self.web_link(selector)
-        path = self.resolve(selector)
-        if path is None:
+        found = self.resolve(selector)
+        if found is None:
             return error('Not here.')
+        path, base, prefix = found['path'], found['base'], found['prefix']
+        inside = os.path.relpath(path, base).replace(os.sep, '/')
         if os.path.isdir(path):
             gophermap = os.path.join(path, 'gophermap')
             if not os.path.isfile(gophermap):
                 return error('Not here.')
-            return self.menu(gophermap, '/' + os.path.relpath(path, self.root).replace(os.sep, '/')
-                             if path != self.root else '/')
-        inside = os.path.relpath(path, self.root).split(os.sep)
-        if inside[0] == 'cgi-bin':
+            return self.menu(gophermap, (prefix + ('' if inside == '.' else '/' + inside)) or '/')
+        if inside.split('/')[0] == 'cgi-bin':
             if not os.access(path, os.X_OK):
                 return error('Not here.')
-            return self.program(path, query)
+            return self.program(path, query, base, found['path_info'])
+        if found['path_info']:
+            return error('Not here.')
         return self.text(path)
 
 
@@ -183,11 +208,21 @@ def main(argv=None):
     parser.add_argument('--host', default='localhost', help='the name in menu links')
     parser.add_argument('--port', type=int, default=7070)
     parser.add_argument('--bind', default='', help='the address to listen on (default: all)')
+    parser.add_argument('--mount', action='append', default=[], metavar='NAME=FOLDER',
+                        help='show FOLDER as the /NAME section (repeatable); it may not exist yet')
     args = parser.parse_args(argv)
     if not os.path.isfile(os.path.join(args.root, 'gophermap')):
         parser.error('no gophermap in ' + args.root)
+    mounts = {}
+    for mount in args.mount:
+        name, _, folder = mount.partition('=')
+        if not re.fullmatch(r'[a-z0-9][a-z0-9-]*', name) or not folder:
+            parser.error('--mount wants NAME=FOLDER, NAME in lowercase letters, digits and -')
+        mounts[name] = folder
     with Server((args.bind, args.port), Handler) as server:
-        server.hole = Hole(args.root, args.host, args.port)
+        server.hole = Hole(args.root, args.host, args.port, mounts)
+        for name, folder in sorted(server.hole.mounts.items()):
+            print('/%s from %s' % (name, folder), flush=True)
         print('gopher://%s:%d/ from %s' % (args.host, args.port, server.hole.root), flush=True)
         server.serve_forever()
 

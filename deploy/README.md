@@ -7,8 +7,8 @@ one-time setup, is in [CI-CD-PLAN.md](../CI-CD-PLAN.md).
 | Environment | Web | Gopher hole | Build dir |
 | --- | --- | --- | --- |
 | local | http://localhost:8765/ | (none) | the repository (`python3 tools/dev-server.py`) |
-| uat | https://www.thoughtrights.com/menu-uat/ | `gopher://thoughtrights.com:7070/` | `/home/ubuntu/build/site-menu-uat` |
-| prod | https://www.thoughtrights.com/menu/, and `/` | `gopher://thoughtrights.com/` | `/home/ubuntu/build/site-menu` |
+| uat | https://www.thoughtrights.com/menu-uat/ | `gopher://gopher.thoughtrights.com:7070/` | `/home/ubuntu/build/site-menu-uat` |
+| prod | https://www.thoughtrights.com/menu/, and `/` | `gopher://gopher.thoughtrights.com/` | `/home/ubuntu/build/site-menu` |
 
 ## Deploying
 
@@ -34,8 +34,8 @@ Each run:
    `tests/test_site.py`, today the Karateka disk) from your machine if you
    have them, and never deletes the server's copy;
 5. on uat, points the page's `<base href>` at `/menu-uat/`;
-6. sets the execute bits on `proxy/gopher.cgi` and the gopher hole's
-   scripts;
+6. sets the execute bits on `proxy/gopher.cgi` and `gopher-server.py`, and
+   makes the hole readable;
 7. smoke-tests the public addresses: `version.json` shows the new commit,
    the page, catalog, scripts and every boot disk load, the gopher proxy
    answers, and the environment's gopher hole answers on its port.

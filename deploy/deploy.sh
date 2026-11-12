@@ -124,7 +124,7 @@ fi
 # 6. execute bits. rsync -a keeps them, but a copy that lost one breaks the
 #    proxy or the gopher hole quietly. Gophernicus skips any script that
 #    isn't world-readable and executable.
-run "chmod 755 '$DEST/html/menu/proxy/gopher.cgi' '$DEST/gopher-server.py' && chmod -R a+rX '$DEST/gopher' && chmod 755 '$DEST/gopher/cgi-bin/search'"
+run "chmod 755 '$DEST/html/menu/proxy/gopher.cgi' '$DEST/gopher-server.py' && chmod -R a+rX '$DEST/gopher' && if [ -d '$DEST/gopher/cgi-bin' ]; then find '$DEST/gopher/cgi-bin' -type f -exec chmod 755 {} +; fi"
 
 # 7. smoke test: the environment as visitors reach it.
 if [ -n "${SKIP_SMOKE:-}" ]; then

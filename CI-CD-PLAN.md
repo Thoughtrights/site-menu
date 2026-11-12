@@ -18,8 +18,8 @@ tools/dev-server.py  ── PR ──▶  Actions: checks
 | Environment | Web | Gopher hole | Build dir |
 | --- | --- | --- | --- |
 | local | http://localhost:8765/ | (none) | the repository (`python3 tools/dev-server.py`) |
-| uat | https://www.thoughtrights.com/menu-uat/ | `gopher://thoughtrights.com:7070/` | `/home/ubuntu/build/site-menu-uat` |
-| prod | https://www.thoughtrights.com/menu/, and `/` as the front page | `gopher://thoughtrights.com/` (port 70) | `/home/ubuntu/build/site-menu` |
+| uat | https://www.thoughtrights.com/menu-uat/ | `gopher://gopher.thoughtrights.com:7070/` | `/home/ubuntu/build/site-menu-uat` |
+| prod | https://www.thoughtrights.com/menu/, and `/` as the front page | `gopher://gopher.thoughtrights.com/` (port 70) | `/home/ubuntu/build/site-menu` |
 
 Apache serves each build directory with an `Alias`, as it does for
 `/character/` and `/character-uat/`. Each environment's gopher hole is a
@@ -90,7 +90,7 @@ Each run:
    nothing else does. The script rewrites that line in the build dir with
    `sed`, as the character script rewrites its shebangs.
 6. **Permissions:** `chmod +x` on `html/menu/proxy/gopher.cgi`, and
-   `chmod -R a+rX` on `gopher/` with `chmod 755` on `gopher/cgi-bin/search`.
+   `chmod -R a+rX` on `gopher/` (and `chmod 755` on anything in `gopher/cgi-bin/`).
    rsync `-a` keeps modes, but a gopher server skips any script that isn't
    world-readable and executable, and a copy that lost a bit breaks things
    quietly.
@@ -135,8 +135,9 @@ untouched either way.
        Options +ExecCGI
        AddHandler cgi-script .cgi
        SetEnv GOPHER_STATE_DIR /var/cache/site-menu-gopher
-       # Dungeoneer's hole, once it runs on this host (or gopher.thoughtrights.com)
-       # SetEnv GOPHER_EXTRA_HOLES localhost:7071=Dungeoneer
+       # The site's hole, first on BRUN GOPHER's home menu. DUNGEONEER
+       # (555-0130) dials its /dungeoneer section.
+       SetEnv GOPHER_EXTRA_HOLES gopher.thoughtrights.com:70=thoughtrights.com
    </Directory>
 
    # uat: the same, at /menu-uat/, kept out of search engines.
@@ -149,6 +150,8 @@ untouched either way.
        Options +ExecCGI
        AddHandler cgi-script .cgi
        SetEnv GOPHER_STATE_DIR /var/cache/site-menu-gopher-uat
+       # uat's hole, on port 7070, which the proxy reaches only when told.
+       SetEnv GOPHER_EXTRA_HOLES gopher.thoughtrights.com:7070=thoughtrights.com
    </Directory>
    ```
 
@@ -162,7 +165,9 @@ untouched either way.
    still the old copy; run it again after the reload.)
 4. **The Karateka disk** goes up with the first deploy from your machine.
    The copy in the old document root can stay until you remove it.
-5. **The two gopher holes.** Ubuntu 20.04 doesn't package Gophernicus, so
+5. **The two gopher holes.** First, DNS: `gopher.thoughtrights.com`
+   pointing at the EC2 host (the units give their menus that name).
+   Ubuntu 20.04 doesn't package Gophernicus, so
    `tools/gopher-server.py` serves them; `deploy.sh` puts it beside each
    build's `gopher/`. Install its two systemd units (INSTALLATION.md
    section 3):
@@ -180,7 +185,9 @@ untouched either way.
    ```
 
    Prod listens on 70 and UAT on 7070, each giving its menus the public
-   host name and its own port. They run as a throwaway unprivileged user
+   host name and its own port, and each showing the character app's
+   `gopher/` folder for that environment at `/dungeoneer`
+   (deploy/dungeoneer-gopher.md). They run as a throwaway unprivileged user
    that may bind the port and read the build dir. Open inbound TCP 70 and
    7070 in the security group.
 6. **The front page,** when wanted: the `DirectoryIndex` line in
@@ -193,10 +200,8 @@ untouched either way.
      `tests/test_deploy.py`, which runs the script with `local` into a
      temporary directory: the uat rewrite, the excludes, `--delete`, and the
      server's Karateka disk surviving a deploy from a machine without it;
-   - [ ] the proxy: today it only talks to port 70 (`GOPHER_PORTS` in
-     `gopher.cgi`). Let the vhost add ports and name the environment's own
-     hole (say `GOPHER_EXTRA_PORTS=7070` and `GOPHER_HOME=thoughtrights.com:7070`
-     for UAT), so `BRUN GOPHER` on UAT lists and can reach UAT's hole.
+   - [x] the proxy reaches and lists each environment's own hole:
+     `GOPHER_EXTRA_HOLES` in the vhost, above;
    Reviewed as a pull request.
 2. **On the server, with you:** the first-time setup above.
 3. **Later:** branch protection and the browser smoke test.

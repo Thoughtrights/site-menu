@@ -810,11 +810,21 @@ const SYSTEMS = {};
 
 /* A gopher hole on the end of the line, such as Dungeoneer's: browsed the
  * way BRUN GOPHER browses, through the site's gopher proxy, starting at
- * the phone book's "hole" (gopher://host:port/). The proxy has to be told
- * the hole is the site's own (GOPHER_EXTRA_HOLES; see INSTALLATION.md). If
- * it can't be reached, the line drops. */
+ * the phone book's "hole": a gopher:// address, or one per environment,
+ * { local, uat, prod }, so a dev copy calls the hole on this machine and
+ * /menu-uat/ calls the uat hole. The proxy has to be told the hole is the
+ * site's own (GOPHER_EXTRA_HOLES; see INSTALLATION.md). If it can't be
+ * reached, the line drops. */
+function environment() {
+    if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+	return 'local';
+    }
+    return new URL(document.baseURI).pathname.startsWith('/menu-uat/') ? 'uat' : 'prod';
+}
+
 SYSTEMS.gopher = (entry, machine) => {
     const PROXY = 'proxy/gopher.cgi';
+    const hole = typeof entry.hole === 'string' ? entry.hole : (entry.hole || {})[environment()];
     let state = null;
 
     async function step(input) {
@@ -852,7 +862,10 @@ SYSTEMS.gopher = (entry, machine) => {
 	async start() {
 	    try {
 		await step(null); // the proxy's home menu, then straight to the hole
-		const reply = await step('G ' + entry.hole);
+		if (!hole) {
+		    return { print: [' ', (entry.name || 'THE HOLE') + ' IS NOT ANSWERING.'], hangup: true };
+		}
+		const reply = await step('G ' + hole);
 		const lines = rows(reply);
 		if (lines.some((text) => /NO ANSWER FROM|NO SUCH HOST/.test(text))) {
 		    return { print: [' ', (entry.name || 'THE HOLE') + ' IS NOT ANSWERING.'], hangup: true };
