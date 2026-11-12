@@ -88,7 +88,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                    CONTENT_TYPE=self.headers.get('Content-Type', ''),
                    HTTP_ORIGIN=self.headers.get('Origin', ''),
                    REMOTE_ADDR=self.client_address[0],
-                   GOPHER_ALLOWED_ORIGINS=' '.join(sorted(origins)))
+                   GOPHER_ALLOWED_ORIGINS=' '.join(sorted(origins)),
+                   # Dungeoneer's hole, run locally from the character repo
+                   # (python3 gopher/hole.py --port 7070); set it to change.
+                   GOPHER_EXTRA_HOLES=os.environ.get('GOPHER_EXTRA_HOLES',
+                                                     'localhost:7070=Dungeoneer'))
         result = subprocess.run([sys.executable, path], input=body, env=env,
                                 capture_output=True, timeout=60)
         head, _, payload = result.stdout.partition(b'\r\n\r\n')

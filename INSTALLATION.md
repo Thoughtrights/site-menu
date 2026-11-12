@@ -8,8 +8,9 @@ build step, no package to install, and no paid service behind it.
 | `html/` | The web root: `html/menu/` is served as `/menu/` | Yes |
 | `html/menu/proxy/gopher.cgi` | The `BRUN GOPHER` proxy (Python 3, standard library) | Yes, if you want GOPHER |
 | `gopher/` | The site index as a gopher hole, for `gopher://thoughtrights.com/` | Yes, if you run a gopher server |
-| `tests/` | Offline tests: the proxy, the catalog and its files, the deploy script | No |
-| `deploy/` | `deploy.sh uat\|prod` and how to use it ([deploy/README.md](deploy/README.md)) | No |
+| `tools/gopher-server.py` | The gopher server for `gopher/` (Python 3.8+, standard library) | Yes, beside `gopher/` |
+| `tests/` | Offline tests: the proxy, the gopher server, the catalog and its files, the deploy script | No |
+| `deploy/` | `deploy.sh uat\|prod`, the gopher server's systemd units, and how to use them ([deploy/README.md](deploy/README.md)) | No |
 | `tools/dev-server.py` | Local server that also runs the CGI | No |
 | `README.md`, `ROADMAP.md`, `INSTALLATION.md`, `CI-CD-PLAN.md` | Notes | No |
 
@@ -127,6 +128,7 @@ Both are environment variables, set with `SetEnv` as above.
 | --- | --- | --- |
 | `GOPHER_ALLOWED_ORIGINS` | `https://www.thoughtrights.com https://thoughtrights.com` | Pages allowed to use the proxy, separated by spaces. Set it if the menu is served from another host name. |
 | `GOPHER_STATE_DIR` | `/tmp/site-menu-gopher` | Where the 10-minute page cache and the per-visitor rate counts are kept. |
+| `GOPHER_EXTRA_HOLES` | (none) | This site's own holes, which may be on another port or a private address: `host:port=Name`, comma-separated, such as `localhost:7070=Dungeoneer`. Only those exact pairs get past the public-address rule; they're listed first on `BRUN GOPHER`'s home menu, and the phone book's `"hole"` lines (DUNGEONEER, 555-0130) need them. The dev server sets `localhost:7070=Dungeoneer`. |
 
 The limits are constants at the top of `gopher.cgi`:
 
@@ -185,54 +187,65 @@ Last, boot the IIe, type `BRUN GOPHER`, and pick an item.
 
 `gopher/` is the site index as a gopher hole: a `gophermap` with every
 link from the HTML menu, and `cgi-bin/search`, a type 7 search over it.
-It is served by Gophernicus, which Ubuntu packages. This is separate from
-the proxy in step 2: the proxy lets the IIe *visit* gopher, this *is* a
-gopher server, reachable from any gopher client (Lagrange, Lynx,
-`BRUN GOPHER`).
+`tools/gopher-server.py` serves it: a small gopher server using Python's
+standard library alone (3.8 and up), because Ubuntu 20.04 doesn't package
+Gophernicus. This is separate from the proxy in step 2: the proxy lets the
+IIe *visit* gopher, this *is* a gopher server, reachable from any gopher
+client (Lagrange, Lynx, `curl gopher://...`, `BRUN GOPHER`).
+
+The server reads gophermaps in Gophernicus's format, so the hole would move
+to Gophernicus unchanged (on Ubuntu 24.04, `apt install gophernicus`,
+pointed at the same folder with `-r` and given the host name with `-h`).
 
 ### What the server needs
 
-- Ubuntu's `gophernicus` package (in `universe`, 3.1.1 on 24.04).
-- `python3` for the search script.
-- **Inbound** TCP port 70 in the EC2 security group, from 0.0.0.0/0
-  (and `::/0` for IPv6).
+- `python3` (Ubuntu 20.04 has 3.8), for the server and the search script.
+- **Inbound** TCP port 70 (prod) and 7070 (uat) in the EC2 security group,
+  from 0.0.0.0/0. The server listens on IPv4.
 
 ### Steps
 
-1. **Install it.** The package turns on `gophernicus.socket`, which
-   listens on port 70 straight away and starts one `gophernicus` per
-   connection as the `_gophernicus` user:
+1. **Deploy as usual.** `deploy/deploy.sh` copies `gopher/` and, beside it,
+   `gopher-server.py` into the build dir (`/home/ubuntu/build/site-menu`
+   or `site-menu-uat`), so the server's own source isn't in the hole.
+
+2. **Install the systemd units,** once. They run the server as a throwaway
+   unprivileged user that may bind its port and read the build dir:
 
    ```bash
-   sudo apt install gophernicus
+   sudo cp deploy/systemd/site-menu-gopher.service deploy/systemd/site-menu-gopher-uat.service /etc/systemd/system/
    ```
-
-2. **Copy the hole to `/srv/gopher`,** Ubuntu's document root for it.
-   Gophernicus skips scripts that aren't world-readable and executable:
 
    ```bash
-   sudo rsync -av --exclude '*~' gopher/ /srv/gopher/
-   sudo chmod -R a+rX /srv/gopher
-   sudo chmod 755 /srv/gopher/cgi-bin/search
+   sudo systemctl daemon-reload
    ```
-
-3. **Give it the public host name.** Without `-h`, every menu line
-   carries the machine's own name, which on EC2 is something like
-   `ip-172-31-0-1.ec2.internal`, and clients can't follow those links.
-   In `/etc/default/gophernicus`:
 
    ```bash
-   OPTIONS=-r /srv/gopher -h thoughtrights.com -nf -nt
+   sudo systemctl enable --now site-menu-gopher site-menu-gopher-uat
    ```
 
-   `-nf` drops the "Gophered by Gophernicus" footer and `-nt` turns off
-   `/server-status`. Then:
+   Each unit names the build dir, the port, and the host name its menus
+   carry (`--host thoughtrights.com`; without it, links would carry the
+   machine's own EC2 name, which clients can't follow). The unprivileged
+   user needs to get into `/home/ubuntu`: `ls -ld /home/ubuntu` should
+   show `x` for others, as Ubuntu 20.04 sets it by default.
 
-   ```bash
-   sudo systemctl restart gophernicus.socket
-   ```
+3. **Open ports 70 and 7070** inbound in the instance's security group.
 
-4. **Open port 70** inbound in the instance's security group.
+4. **Logs:** one line per request, `journalctl -u site-menu-gopher`.
+   After a deploy that changes `gopher-server.py`, restart the unit
+   (`sudo systemctl restart site-menu-gopher`); changes to the hole itself
+   need no restart.
+
+To try it locally:
+
+```bash
+python3 tools/gopher-server.py --root gopher --host localhost --port 7071
+```
+
+```bash
+curl -s gopher://localhost:7071/1/
+```
 
 ### Check it
 
@@ -255,8 +268,8 @@ the other video links. Then try `BRUN GOPHER` and
 
 - **Links** are lines of `type`, name, tab, selector (and optionally
   tab, host, tab, port). Lines with no tab are plain text. Web pages are
-  type `h` with a `URL:https://...` selector. See
-  `/usr/share/doc/gophernicus/README.gophermap` on the server.
+  type `h` with a `URL:https://...` selector. `#` starts a comment and
+  `!` gives the menu a title (the format is Gophernicus's).
 - **Text** goes in as files (`0About this site`, a tab, `/about.txt`), which
   suits the resume, the job post and anything else that is already text.
 - **Programs** go in `cgi-bin/`. A type 7 item sends what the visitor

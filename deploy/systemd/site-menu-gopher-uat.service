@@ -1,0 +1,26 @@
+# The site's gopher hole, uat: gopher://thoughtrights.com:7070/.
+# tools/gopher-server.py, deployed by deploy/deploy.sh uat into
+# /home/ubuntu/build/site-menu-uat. Install once (CI-CD-PLAN.md):
+#   sudo cp deploy/systemd/site-menu-gopher-uat.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now site-menu-gopher-uat
+# 7070 isn't a privileged port; it runs locked down all the same.
+
+[Unit]
+Description=thoughtrights.com gopher hole (uat, port 7070)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/ubuntu/build/site-menu-uat/gopher-server.py --root /home/ubuntu/build/site-menu-uat/gopher --host thoughtrights.com --port 7070
+Restart=on-failure
+DynamicUser=yes
+CapabilityBoundingSet=
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+
+[Install]
+WantedBy=multi-user.target

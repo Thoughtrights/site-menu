@@ -83,8 +83,13 @@ class DeployTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(menu, 'notes.txt~')))
         self.assertFalse(os.path.exists(os.path.join(menu, 'assets', 'command-data.json~')))
         self.assertFalse(os.path.exists(os.path.join(dest, '.git')))
+        # The gopher server sits beside the hole, not in it, so its source
+        # isn't served.
+        self.assertTrue(os.path.isfile(os.path.join(dest, 'gopher-server.py')))
+        self.assertFalse(os.path.exists(os.path.join(dest, 'gopher', 'gopher-server.py')))
         for script in (os.path.join(menu, 'proxy', 'gopher.cgi'),
-                       os.path.join(dest, 'gopher', 'cgi-bin', 'search')):
+                       os.path.join(dest, 'gopher', 'cgi-bin', 'search'),
+                       os.path.join(dest, 'gopher-server.py')):
             self.assertTrue(os.stat(script).st_mode & stat.S_IXOTH, script)
 
     def test_prod_keeps_the_menu_mount(self):

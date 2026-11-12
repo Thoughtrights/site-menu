@@ -23,7 +23,7 @@ tools/dev-server.py  ── PR ──▶  Actions: checks
 
 Apache serves each build directory with an `Alias`, as it does for
 `/character/` and `/character-uat/`. Each environment's gopher hole is a
-Gophernicus serving that build's `gopher/` folder, on its own port.
+tools/gopher-server.py serving that build's `gopher/` folder, on its own port.
 
 ## Decided (2026-11-11)
 
@@ -91,7 +91,7 @@ Each run:
    `sed`, as the character script rewrites its shebangs.
 6. **Permissions:** `chmod +x` on `html/menu/proxy/gopher.cgi`, and
    `chmod -R a+rX` on `gopher/` with `chmod 755` on `gopher/cgi-bin/search`.
-   rsync `-a` keeps modes, but Gophernicus skips any script that isn't
+   rsync `-a` keeps modes, but a gopher server skips any script that isn't
    world-readable and executable, and a copy that lost a bit breaks things
    quietly.
 7. **Smoke test** the environment's public addresses, from your machine:
@@ -135,6 +135,8 @@ untouched either way.
        Options +ExecCGI
        AddHandler cgi-script .cgi
        SetEnv GOPHER_STATE_DIR /var/cache/site-menu-gopher
+       # Dungeoneer's hole, once it runs on this host (or gopher.thoughtrights.com)
+       # SetEnv GOPHER_EXTRA_HOLES localhost:7071=Dungeoneer
    </Directory>
 
    # uat: the same, at /menu-uat/, kept out of search engines.
@@ -160,28 +162,27 @@ untouched either way.
    still the old copy; run it again after the reload.)
 4. **The Karateka disk** goes up with the first deploy from your machine.
    The copy in the old document root can stay until you remove it.
-5. **The two gopher holes.** `sudo apt install gophernicus` gives a
-   socket on port 70. Point it at the prod build in
-   `/etc/default/gophernicus`:
+5. **The two gopher holes.** Ubuntu 20.04 doesn't package Gophernicus, so
+   `tools/gopher-server.py` serves them; `deploy.sh` puts it beside each
+   build's `gopher/`. Install its two systemd units (INSTALLATION.md
+   section 3):
 
    ```bash
-   OPTIONS=-r /home/ubuntu/build/site-menu/gopher -h thoughtrights.com -nf -nt
+   sudo cp deploy/systemd/site-menu-gopher.service deploy/systemd/site-menu-gopher-uat.service /etc/systemd/system/
    ```
-
-   For UAT, a second socket and service, `gophernicus-uat.socket`
-   (`ListenStream=7070`, `Accept=yes`) and `gophernicus-uat@.service`,
-   copied from the package's own units with:
 
    ```bash
-   ExecStart=/usr/sbin/gophernicus -r /home/ubuntu/build/site-menu-uat/gopher -h thoughtrights.com -p 7070 -nf -nt
+   sudo systemctl daemon-reload
    ```
 
-   `-p 7070` makes its menu links point back at port 7070; the search
-   script already reads the port it's given. Check the package's units for
-   its exact paths and user before copying them. Gophernicus runs as
-   `_gophernicus`, which needs to read the build dirs, as `www-data` already
-   does for the character app. Open inbound TCP 70 and 7070 in the security
-   group.
+   ```bash
+   sudo systemctl enable --now site-menu-gopher site-menu-gopher-uat
+   ```
+
+   Prod listens on 70 and UAT on 7070, each giving its menus the public
+   host name and its own port. They run as a throwaway unprivileged user
+   that may bind the port and read the build dir. Open inbound TCP 70 and
+   7070 in the security group.
 6. **The front page,** when wanted: the `DirectoryIndex` line in
    INSTALLATION.md.
 

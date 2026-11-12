@@ -803,9 +803,69 @@ async function touchTones(machine, number, digitSeconds, gapSeconds) {
 
 /* What's on the other end of a carrier. The phone book names one for a
  * number ("system": "maxwell"). Each is a function of that phone book
- * entry returning { start(), input(text) }; both give back
- * { print: [lines], prompt: 'text', hangup: true }, all optional. */
+ * entry (and the machine) returning { start(), input(text) }; both give
+ * back { print: [lines], prompt: 'text', hangup: true }, all optional, or
+ * a promise of one. */
 const SYSTEMS = {};
+
+/* A gopher hole on the end of the line, such as Dungeoneer's: browsed the
+ * way BRUN GOPHER browses, through the site's gopher proxy, starting at
+ * the phone book's "hole" (gopher://host:port/). The proxy has to be told
+ * the hole is the site's own (GOPHER_EXTRA_HOLES; see INSTALLATION.md). If
+ * it can't be reached, the line drops. */
+SYSTEMS.gopher = (entry, machine) => {
+    const PROXY = 'proxy/gopher.cgi';
+    let state = null;
+
+    async function step(input) {
+	const reply = await machine.wait(fetch(PROXY, {
+	    method: 'POST',
+	    headers: { 'Content-Type': 'application/json' },
+	    body: JSON.stringify({ input, state, columns: machine.columns(), rows: machine.rows() - 1 }),
+	}).then((response) => {
+	    if (!response.ok) {
+		throw new Error('HTTP ' + response.status);
+	    }
+	    return response.json();
+	}));
+	state = reply.state === undefined ? null : reply.state;
+	return reply;
+    }
+
+    const rows = (reply) => (reply.print || []).flatMap((text) => toAscii(text).split('\n'))
+	  .flatMap((text) => text.length <= machine.columns() ? [text || ' '] : wordWrap(text, machine.columns()));
+
+    async function answer(input) {
+	try {
+	    const reply = await step(input);
+	    if (reply.exit) {
+		return { print: rows(reply), hangup: true };
+	    }
+	    return { print: rows(reply), prompt: toAscii(reply.prompt || '?') };
+	} catch (error) {
+	    console.log(error);
+	    return { print: [' ', 'THE LINE WENT DEAD.'], hangup: true };
+	}
+    }
+
+    return {
+	async start() {
+	    try {
+		await step(null); // the proxy's home menu, then straight to the hole
+		const reply = await step('G ' + entry.hole);
+		const lines = rows(reply);
+		if (lines.some((text) => /NO ANSWER FROM|NO SUCH HOST/.test(text))) {
+		    return { print: [' ', (entry.name || 'THE HOLE') + ' IS NOT ANSWERING.'], hangup: true };
+		}
+		return { print: [' ', entry.name || '', ...lines], prompt: toAscii(reply.prompt || '?') };
+	    } catch (error) {
+		console.log(error);
+		return { print: [' ', 'THE LINE WENT DEAD.'], hangup: true };
+	    }
+	},
+	input: (text) => answer(text),
+    };
+};
 
 /* A system with a logon. Every one takes the same three accounts, so a
  * visitor is never stuck on outside knowledge:
@@ -966,6 +1026,7 @@ SYSTEMS.hellhound = () => {
 	    print: [' ', 'HELLHOUND SOFTWARE', 'GAMES FROM BELOW SINCE 1982', ' ',
 		    'NOW IN DEVELOPMENT:',
 		    '  DUNGEONEER       APPLE II, 48K, 2 DISKS',
+		    '                   BETA LINE: 555-0130',
 		    '  BRIMSTONE MAZE   ATARI 800', ' ',
 		    'THE SYSOP IS OUT.'],
 	    prompt: 'LEAVE A MESSAGE (Y/N)? ',
@@ -1048,7 +1109,7 @@ async function placeCall(machine, book, number, speaker = true) {
 	}
 	const baud = there.baud || 300;
 	if (SYSTEMS[there.system]) {
-	    return { system: SYSTEMS[there.system](there), baud };
+	    return { system: SYSTEMS[there.system](there, machine), baud };
 	}
 	machine.print(['CONNECT ' + baud]);
 	await sound.pause(4); // nobody home: the line goes quiet, then drops
@@ -1079,16 +1140,19 @@ PROGRAMS.modem = (machine) => {
 	return placeCall(machine, book, number, speaker);
     }
 
-    function show(result, before = []) {
-	// What a system sent: its lines, then its prompt, or the line dropping.
-	const lines = [...before, ...(result.print || [])];
-	if (result.hangup) {
-	    online = null;
-	    machine.setPrompt('');
-	    return machine.print([...lines, 'NO CARRIER']);
-	}
-	machine.setPrompt(result.prompt || '');
-	return machine.print(lines);
+    function show(reply, before = []) {
+	// What a system sent (or will send, if it has to wait on the
+	// network): its lines, then its prompt, or the line dropping.
+	return Promise.resolve(reply).then((result) => {
+	    const lines = [...before, ...(result.print || [])];
+	    if (result.hangup) {
+		online = null;
+		machine.setPrompt('');
+		return machine.print([...lines, 'NO CARRIER']);
+	    }
+	    machine.setPrompt(result.prompt || '');
+	    return machine.print(lines);
+	});
     }
 
     function command(text) {
@@ -1174,9 +1238,12 @@ PROGRAMS.modem = (machine) => {
 		}
 		online = { system: result.system, baud: result.baud, prompt: '' };
 		held = false;
-		const opening = result.system.start();
-		online.prompt = opening.prompt || '';
-		return show(opening, ['CONNECT ' + result.baud]);
+		return Promise.resolve(result.system.start()).then((opening) => {
+		    if (online) {
+			online.prompt = opening.prompt || ''; // for ATO
+		    }
+		    return show(opening, ['CONNECT ' + result.baud]);
+		});
 	    });
 	},
     };
@@ -1230,13 +1297,16 @@ PROGRAMS.dialup = (machine) => {
 	    .then(() => directory());
     }
 
-    function show(result, before = []) {
-	const lines = [...before, ...(result.print || [])];
-	if (result.hangup) {
-	    return hangUp(lines);
-	}
-	machine.setPrompt(result.prompt || '');
-	return machine.print(lines);
+    function show(reply, before = []) {
+	// A system's reply, which may still be on its way.
+	return Promise.resolve(reply).then((result) => {
+	    const lines = [...before, ...(result.print || [])];
+	    if (result.hangup) {
+		return hangUp(lines);
+	    }
+	    machine.setPrompt(result.prompt || '');
+	    return machine.print(lines);
+	});
     }
 
     async function dial(number) {

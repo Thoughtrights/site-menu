@@ -1,7 +1,7 @@
 !thoughtrights.com
 #
 # The site index as a gopher menu: gopher://thoughtrights.com/
-# Served by Gophernicus from /srv/gopher (see INSTALLATION.md).
+# Served by tools/gopher-server.py (Gophernicus would do too; see INSTALLATION.md).
 # Fields are separated by ONE tab. Lines without a tab are plain text.
 #
             * under renewed management *

@@ -87,12 +87,14 @@ while IFS= read -r disk; do
   [ -n "$disk" ] && RSYNC_OPTS+=(--exclude "/html/menu/$disk")
 done <<< "$NOT_SHIPPED"
 
-echo "==> Syncing html/ and gopher/"
+echo "==> Syncing html/, gopher/ and the gopher server"
 run "mkdir -p '$DEST'"
+# tools/gopher-server.py lands beside the hole as $DEST/gopher-server.py, not
+# inside it, so its source isn't served (deploy/systemd/ runs it).
 if [ -n "$HOST" ]; then
-  rsync "${RSYNC_OPTS[@]}" "$REPO_ROOT/html" "$REPO_ROOT/gopher" "$HOST:$DEST/"
+  rsync "${RSYNC_OPTS[@]}" "$REPO_ROOT/html" "$REPO_ROOT/gopher" "$REPO_ROOT/tools/gopher-server.py" "$HOST:$DEST/"
 else
-  rsync "${RSYNC_OPTS[@]}" "$REPO_ROOT/html" "$REPO_ROOT/gopher" "$DEST/"
+  rsync "${RSYNC_OPTS[@]}" "$REPO_ROOT/html" "$REPO_ROOT/gopher" "$REPO_ROOT/tools/gopher-server.py" "$DEST/"
 fi
 
 # 4. the disks kept out of git, additively: never --delete here.
@@ -122,7 +124,7 @@ fi
 # 6. execute bits. rsync -a keeps them, but a copy that lost one breaks the
 #    proxy or the gopher hole quietly. Gophernicus skips any script that
 #    isn't world-readable and executable.
-run "chmod 755 '$DEST/html/menu/proxy/gopher.cgi' && chmod -R a+rX '$DEST/gopher' && chmod 755 '$DEST/gopher/cgi-bin/search'"
+run "chmod 755 '$DEST/html/menu/proxy/gopher.cgi' '$DEST/gopher-server.py' && chmod -R a+rX '$DEST/gopher' && chmod 755 '$DEST/gopher/cgi-bin/search'"
 
 # 7. smoke test: the environment as visitors reach it.
 if [ -n "${SKIP_SMOKE:-}" ]; then

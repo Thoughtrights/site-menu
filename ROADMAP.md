@@ -173,11 +173,27 @@ real one holds 560. Some entries aren't really disks at all.
 ## The gopher hole
 
 `gopher/` holds the site index as a gopher menu and a search, served by
-Gophernicus (INSTALLATION.md section 3). Tested locally, not deployed.
+`tools/gopher-server.py`, a small standard-library gopher server written
+because Ubuntu 20.04 doesn't package Gophernicus (INSTALLATION.md section
+3). Tested locally, through the Apple too; not deployed.
 
-- [ ] Deploy it, twice: prod on port 70 and UAT on port 7070, each a
-      Gophernicus serving its build's `gopher/` (CI-CD-PLAN.md). Needs your
-      go-ahead.
+- [x] **Dungeoneer's hole** (`~/src/character/gopher/`) is reachable from
+      the Apple: dial 555-0130 (`DIALUP` or `PR#2`; Hellhound's BBS gives
+      the number) for DUNGEONEER, or pick it from `BRUN GOPHER`'s home menu.
+      The proxy only reaches it when named in `GOPHER_EXTRA_HOLES`, and
+      leaves out profiles' DM-only parts. Tested against a stand-in hole;
+      the real one isn't public yet.
+- [ ] A public name for the holes: `gopher.thoughtrights.com`, one DNS
+      record pointing at the EC2 host. Then the site's hole on port 70,
+      Dungeoneer's on another port (or its own name), and the phone book's
+      `"hole"` and the vhost's `GOPHER_EXTRA_HOLES` set to match.
+- [x] A gopher server that runs on Ubuntu 20.04: `tools/gopher-server.py`,
+      with systemd units in `deploy/systemd/` and tests that run it.
+- [ ] Deploy it, twice: prod on port 70 and UAT on port 7070, each
+      serving its build's `gopher/` (CI-CD-PLAN.md). Needs your go-ahead.
+- [ ] The server itself: Ubuntu 20.04 left standard support in May 2025,
+      and "20.04.1" suggests it hasn't had a full upgrade since 2020. Plan
+      an upgrade (24.04 would also package Gophernicus).
 - [ ] Let `BRUN GOPHER` reach and list each environment's own hole: the
       proxy only talks to port 70 today.
 - [ ] `BRUN GOPHER`: choosing a web link (type `h`) prints `FILE TYPE
@@ -185,7 +201,7 @@ Gophernicus (INSTALLATION.md section 3). Tested locally, not deployed.
       `https` only). The remote program protocol needs a way to ask the page
       to open a URL.
 - [ ] Check whether the gophermap's `!` title line prints twice through the
-      proxy, as the proposals report. Needs Gophernicus running.
+      proxy, as the proposals report.
 - [ ] Add our own hole to `BRUN GOPHER`'s home menu once it's live.
 - [ ] More interfaces in the hole, as gopher applications: the weather
       forecast as text, the baseball cards as a searchable list, the

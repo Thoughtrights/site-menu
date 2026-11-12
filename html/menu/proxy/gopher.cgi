@@ -38,6 +38,22 @@ ALLOWED_ORIGINS = os.environ.get(
     'GOPHER_ALLOWED_ORIGINS',
     'https://www.thoughtrights.com https://thoughtrights.com').split()
 
+
+def extra_holes(setting):
+    """Holes this site runs itself, which may be on another port or a
+    private address: "host:port=Name, host:port=Name". Only these exact
+    host and port pairs get past the public-address rule."""
+    holes = {}
+    for entry in setting.split(','):
+        address, _, name = entry.strip().partition('=')
+        host, _, port = address.strip().rpartition(':')
+        if host and port.isdigit():
+            holes[(host.lower(), int(port))] = name.strip() or host
+    return holes
+
+
+EXTRA_HOLES = extra_holes(os.environ.get('GOPHER_EXTRA_HOLES', ''))
+
 # Where BRUN GOPHER starts: a menu of its own, of gopher holes that were
 # up and worth a visit in November 2026. (type, text, selector, host, port)
 HOME = [
@@ -73,6 +89,16 @@ HOME = [
     ('1', 'New gopher servers since 1999', '/new', 'gopher.floodgap.com', 70),
 ]
 
+
+def home():
+    """The home menu, with this site's own holes first when there are any."""
+    if not EXTRA_HOLES:
+        return HOME
+    ours = [('i', 'THIS SITE', '', '', 0)] + [
+        ('1', name, '/', host, port) for (host, port), name in EXTRA_HOLES.items()]
+    return HOME[:2] + ours + [('i', '', '', '', 0)] + HOME[2:]
+
+
 HELP = [
     ' ',
     'NUMBER   GO THERE',
@@ -96,20 +122,30 @@ class GopherError(Exception):
 
 # --- Fetching -----------------------------------------------------------
 
-def public_address(host, port):
-    """The address to connect to, only if host is a public internet host
-    and port is the gopher port. Connecting to the address that was
-    checked (not the name again) stops DNS tricks."""
-    if port not in GOPHER_PORTS or not re.fullmatch(r'[A-Za-z0-9.-]{1,253}', host or ''):
+def allowed_addresses(host, port):
+    """The addresses to try, in order, only if host is a public internet
+    host and port is the gopher port, or the pair is one of this site's own
+    holes (EXTRA_HOLES). Connecting to the addresses that were checked (not
+    the name again) stops DNS tricks."""
+    if not re.fullmatch(r'[A-Za-z0-9.-]{1,253}', host or ''):
         raise GopherError('NO ANSWER FROM ' + (host or '?'))
+    ours = (host.lower(), port) in EXTRA_HOLES
+    if port not in GOPHER_PORTS and not ours:
+        raise GopherError('NO ANSWER FROM ' + host)
     try:
         infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     except OSError:
         raise GopherError('NO SUCH HOST ' + host)
-    for family, _, _, _, address in infos:
-        if ipaddress.ip_address(address[0]).is_global:
-            return family, address
-    raise GopherError('NO ANSWER FROM ' + host)
+    allowed = [(family, address) for family, _, _, _, address in infos
+               if ours or ipaddress.ip_address(address[0]).is_global]
+    if not allowed:
+        raise GopherError('NO ANSWER FROM ' + host)
+    return allowed
+
+
+def public_address(host, port):
+    """The first address allowed_addresses() would try."""
+    return allowed_addresses(host, port)[0]
 
 
 def cache_path(*parts):
@@ -127,20 +163,26 @@ def fetch(host, port, selector, query=None):
     except OSError:
         pass
 
-    family, address = public_address(host, port)
     request = selector + ('\t' + query if query is not None else '') + '\r\n'
-    data = b''
-    try:
-        with socket.socket(family, socket.SOCK_STREAM) as connection:
-            connection.settimeout(TIMEOUT_SECONDS)
-            connection.connect(address)
-            connection.sendall(request.encode('utf-8'))
-            while len(data) < MAX_BYTES:
-                chunk = connection.recv(16384)
-                if not chunk:
-                    break
-                data += chunk
-    except OSError:
+    data = None
+    # Each allowed address in turn, as a browser does: "localhost" is often
+    # ::1 first, and a small server may only listen on 127.0.0.1.
+    for family, address in allowed_addresses(host, port):
+        try:
+            with socket.socket(family, socket.SOCK_STREAM) as connection:
+                connection.settimeout(TIMEOUT_SECONDS)
+                connection.connect(address)
+                connection.sendall(request.encode('utf-8'))
+                data = b''
+                while len(data) < MAX_BYTES:
+                    chunk = connection.recv(16384)
+                    if not chunk:
+                        break
+                    data += chunk
+            break
+        except OSError:
+            data = None
+    if data is None:
         raise GopherError('NO ANSWER FROM ' + host)
     text = data[:MAX_BYTES].decode('utf-8', 'replace')
 
@@ -200,7 +242,8 @@ def parse_menu(text):
 
 def parse_url(text):
     """gopher://host[:port]/[type][selector] -> a place, or None."""
-    match = re.fullmatch(r'(?:gopher://)?([A-Za-z0-9.-]+)(?::(\d+))?(?:/(.)(.*))?', text.strip())
+    # A bare trailing slash (gopher://host/) is the top menu, as no slash is.
+    match = re.fullmatch(r'(?:gopher://)?([A-Za-z0-9.-]+)(?::(\d+))?(?:/(.?)(.*))?', text.strip())
     if not match:
         return None
     host, port, kind, selector = match.groups()
@@ -246,6 +289,30 @@ def wrap(text, width):
     return rows
 
 
+def without_dm_notes(lines):
+    """Leave out what a game master's text keeps from players, as
+    Dungeoneer's hole asks: a section whose UPPERCASE head (over a row of
+    dashes) names the DM, up to the next head, and a paragraph that starts
+    "Secret (for the DM)", up to the next blank line."""
+    def is_head(i):
+        line = lines[i].strip()
+        below = lines[i + 1].strip() if i + 1 < len(lines) else ''
+        return bool(line) and line == line.upper() and re.search('[A-Z]', line) \
+            and bool(re.fullmatch(r'-{3,}', below))
+
+    kept, in_section, in_paragraph = [], False, False
+    for i, line in enumerate(lines):
+        if is_head(i):
+            in_section = bool(re.search(r'\bDM\b', line.upper()))
+        if line.strip().startswith('Secret (for the DM)'):
+            in_paragraph = True
+        elif in_paragraph and not line.strip():
+            in_paragraph = False
+        if not in_section and not in_paragraph:
+            kept.append(line)
+    return kept
+
+
 def text_rows(lines, columns):
     """A text document on the screen. Most gopher text is wrapped at 70
     or so columns; on a 40 column screen, rejoin its paragraphs and wrap
@@ -287,11 +354,12 @@ def text_rows(lines, columns):
 def screen_rows(place, columns):
     """Everything at a place as screen rows, and its numbered links."""
     if place is None:
-        items = HOME
+        items = home()
     else:
         text = fetch(place['h'], place['p'], place['s'], place.get('q'))
         if place['t'] == '0':
-            lines = [ascii(line) for line in strip_terminator(text.replace('\r\n', '\n').split('\n'))]
+            lines = without_dm_notes(strip_terminator(text.replace('\r\n', '\n').split('\n')))
+            lines = [ascii(line) for line in lines]
             return [' ', place['n'][:columns], ' '] + text_rows(lines, columns), []
         items = parse_menu(text)
 

@@ -27,7 +27,9 @@ Each run:
    rsync ships the working tree, so uncommitted changes mark it `-dirty`;
 3. syncs `html/` and `gopher/` to the build dir with `--delete`, leaving out
    editor backups (`*~`), the dev server's copies of other projects
-   (`html/baseball-cards/`, `html/barzy/`), and the disks kept out of git;
+   (`html/baseball-cards/`, `html/barzy/`), and the disks kept out of git,
+   and puts `tools/gopher-server.py` beside the hole as `gopher-server.py`
+   (its systemd units are in `systemd/`; restart them after it changes);
 4. copies the disks kept out of git (`DISKS_NOT_SHIPPED` in
    `tests/test_site.py`, today the Karateka disk) from your machine if you
    have them, and never deletes the server's copy;
