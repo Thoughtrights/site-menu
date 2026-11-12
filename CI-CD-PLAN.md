@@ -188,11 +188,11 @@ untouched either way.
 ## Order of work
 
 1. **In the repository, no server needed:**
-   - `deploy/deploy.sh` and a `deploy/README.md` like the character app's
-     (`version.json` is already in `.gitignore`);
-   - a test that runs the script with `local` against a temporary directory:
-     the uat rewrite, the excludes, the additive disk step;
-   - the proxy: today it only talks to port 70 (`GOPHER_PORTS` in
+   - [x] `deploy/deploy.sh` and `deploy/README.md`, and
+     `tests/test_deploy.py`, which runs the script with `local` into a
+     temporary directory: the uat rewrite, the excludes, `--delete`, and the
+     server's Karateka disk surviving a deploy from a machine without it;
+   - [ ] the proxy: today it only talks to port 70 (`GOPHER_PORTS` in
      `gopher.cgi`). Let the vhost add ports and name the environment's own
      hole (say `GOPHER_EXTRA_PORTS=7070` and `GOPHER_HOME=thoughtrights.com:7070`
      for UAT), so `BRUN GOPHER` on UAT lists and can reach UAT's hole.

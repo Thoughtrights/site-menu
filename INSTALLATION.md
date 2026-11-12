@@ -8,7 +8,8 @@ build step, no package to install, and no paid service behind it.
 | `html/` | The web root: `html/menu/` is served as `/menu/` | Yes |
 | `html/menu/proxy/gopher.cgi` | The `BRUN GOPHER` proxy (Python 3, standard library) | Yes, if you want GOPHER |
 | `gopher/` | The site index as a gopher hole, for `gopher://thoughtrights.com/` | Yes, if you run a gopher server |
-| `tests/` | Offline tests for the proxy | No |
+| `tests/` | Offline tests: the proxy, the catalog and its files, the deploy script | No |
+| `deploy/` | `deploy.sh uat\|prod` and how to use it ([deploy/README.md](deploy/README.md)) | No |
 | `tools/dev-server.py` | Local server that also runs the CGI | No |
 | `README.md`, `ROADMAP.md`, `INSTALLATION.md`, `CI-CD-PLAN.md` | Notes | No |
 
@@ -30,7 +31,7 @@ menu.
 
 The Apple page names its address in one place, `<base href="/menu/">`, so
 that it also works as the front page; everything else is relative. To serve
-it somewhere else, change that line (the planned `deploy/deploy.sh uat` does
+it somewhere else, change that line (`deploy/deploy.sh uat` does
 this for `/menu-uat/`; see [CI-CD-PLAN.md](CI-CD-PLAN.md)).
 
 ### The Apple as the front page (optional)
@@ -293,7 +294,7 @@ also checks that the JavaScript parses (`.github/workflows/checks.yml`). A
 `boot` entry whose disk we may not redistribute in git must be listed in
 `DISKS_NOT_SHIPPED` in `tests/test_site.py` and in `.gitignore`. The tests
 then check that the disk is never committed; a copy in your working tree is
-fine, and is what the planned `deploy/deploy.sh` sends to the server. Every
+fine, and is what `deploy/deploy.sh` sends to the server. Every
 other disk is in git.
 
 To try phone mode, open the page in a phone-sized window with touch

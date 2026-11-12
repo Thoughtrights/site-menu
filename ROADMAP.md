@@ -460,8 +460,8 @@ directory on the EC2 host that Apache serves at `/menu-uat/` or `/menu/`,
 each with its own gopher hole (ports 7070 and 70). Uncommitted changes may
 go to prod, stamped `-dirty`.
 
-- [ ] Write `deploy/deploy.sh`, with its README and a test that runs it
-      against a temporary directory.
+- [x] `deploy/deploy.sh uat|prod`, with `deploy/README.md` and a test that
+      runs it against a temporary directory. Not yet run against the server.
 - [ ] First-time server setup, by hand, once: the two `Alias` blocks, the
       proxy's cache directories and the two gopher holes. Needs your
       go-ahead.
