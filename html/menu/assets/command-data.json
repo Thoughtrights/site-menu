@@ -201,10 +201,12 @@
 	"payload": ["BRUN FOOD MADNESS"]
     },
     "RUN DUNGEONEER" : {
-	"action": "redirect",
+	"action": "program",
 	"type": "A",
 	"sectors": 2,
-	"payload": ["https://www.dungeoneer.com/"]
+	"payload": ["gopher", { "local": "gopher://localhost:7070/1/dungeoneer",
+				"uat": "gopher://gopher.thoughtrights.com:7070/1/dungeoneer",
+				"prod": "gopher://gopher.thoughtrights.com/1/dungeoneer" }, "DUNGEONEER"]
     },
     "BRUN TEMP3RCAST" : {
 	"action": "redirect",

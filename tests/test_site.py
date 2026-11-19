@@ -77,6 +77,11 @@ class CommandDataTest(unittest.TestCase):
                 self.assertTrue(exists('assets/zork/%s.z3' % args[0]), name)
             if program == 'remote':
                 self.assertTrue(exists(args[0]), name)
+            if program == 'gopher':
+                hole = args[0]
+                addresses = [hole] if isinstance(hole, str) else [hole[env] for env in ('local', 'uat', 'prod')]
+                for address in addresses:
+                    self.assertTrue(address.startswith('gopher://'), name)
 
     def test_boot_disks_exist(self):
         for name, entry in self.entries('boot').items():

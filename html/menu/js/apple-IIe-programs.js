@@ -880,6 +880,26 @@ SYSTEMS.gopher = (entry, machine) => {
     };
 };
 
+/* A gopher hole straight from the disk, no modem: RUN DUNGEONEER.
+ * payload: ["gopher", address, "NAME"], the address as in the phone book
+ * (one gopher:// address, or { local, uat, prod }). The same as dialling
+ * the hole's number, through SYSTEMS.gopher. */
+PROGRAMS.gopher = (machine, hole, name) => {
+    const line = SYSTEMS.gopher({ hole, name }, machine);
+    const show = (reply) => {
+	if (reply.hangup) {
+	    machine.exit();
+	} else {
+	    machine.setPrompt(reply.prompt || '?');
+	}
+	return machine.print(reply.print || []);
+    };
+    return {
+	start: () => line.start().then(show),
+	input: (text) => line.input(text).then(show),
+    };
+};
+
 /* A system with a logon. Every one takes the same three accounts, so a
  * visitor is never stuck on outside knowledge:
  *   guest   gets in, to a smaller area that hints at the rest;
