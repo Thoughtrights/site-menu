@@ -93,10 +93,39 @@ mutes, Q quits. What's left:
 
 - [ ] Write `RESUME.TXT`: the resume as wrapped plain text. It only exists as
       a web page, PDF and DOCX today. Yours to write.
-- [ ] `OPEN RESUME` prints it instead of redirecting, with the web page and
-      PDFs still a command away.
+- [ ] `OPEN RESUME` back on the disk, printing it page by page (as
+      `OPEN JOBPOST` does), with the web page and PDFs a command away. It
+      was a redirect to `/resume/` until 2026-11-11 (see "Off the disk for
+      now").
 - [ ] Later, in the BBS's file area: "downloading" the PDF runs a fake XMODEM
       transfer, then the browser really downloads it.
+
+### Off the disk for now
+
+Taken out of `CATALOG` on 2026-11-11: each one only jumped out of the Apple
+to a web page. They come back when they work inside it, the way Barzy, the
+baseball cards and Dungeoneer do. The plain menu (`index.html`) still links
+all of them.
+
+- [ ] **SELFEYES** (was `BRUN SELFEYES`, `/selfeyes/`): the essay as text,
+      in the BBS file area, and the pictures through the hi-res layer.
+- [ ] **SPOKENWORD** (was `RUN SPOKENWORD`, `/spoken-word/`): the tape deck
+      in the BBS's poetry corner. Needs the texts.
+- [ ] **TEMP3RCAST** (was `BRUN TEMP3RCAST`, `/weather/`): the forecast as
+      text from `/weather/weather.api`, and its announcer.
+- [ ] **NYC CAM** (was `BRUN NYC CAM`, `/cam/`): browse the cameras by
+      borough or street, a frame drawn in hi-res.
+- [ ] **FOODNET**, **QUIVER**, **FOOD MADNESS** (were redirects to
+      `www.food.net`, `qr.food.net`, `madness.food.net`): decide what each
+      would be on the Apple, if anything.
+- [ ] **TECH-HUNTERDON** (was `OPEN TECH-HUNTERDON`, the GitHub
+      organization): a text file about it, as `OPEN JOBPOST` is.
+- [ ] **DAEMOUS** (was `BRUN DAEMOUS`, `/daemous/`): the 1989 self-portrait
+      in hi-res. The daemous system on 555-0147 stays.
+- [ ] **WOPR** (was `BRUN WOPR`, `/WOPR/`, the interstitials page): see
+      "WOPR: a computer that wants to play".
+- [ ] **ALPHACOMPLEX** and **INDIGOBRIEF**: see "Alpha Complex".
+- [ ] **RESUME**: see "Resume" above.
 
 ### Dungeoneer: light on the Apple
 
@@ -364,7 +393,8 @@ QUALITY (1-5)? 3
 
 ### Alpha Complex
 
-`BRUN ALPHACOMPLEX` redirects to drow@bin.sh's version, which no longer works:
+`BRUN ALPHACOMPLEX` redirected to drow@bin.sh's version until 2026-11-11, when
+it and `OPEN INDIGOBRIEF` came off the disk. That version no longer works:
 `alpha.cgi` refuses requests (403), and the game text isn't in any page still
 reachable. It is a solo Paranoia adventure by Sam Shirley from Space
 Gamer/Fantasy Gamer No. 77, which bin.sh describes as public domain and not to
@@ -395,8 +425,9 @@ To bring it back inside the terminal:
 - [ ] Store the sections and choices as data and play them with one small
       program: numbered choices, six clones, "not selecting an option is
       treason".
-- [ ] Keep the non-commercial terms and the credits that `OPEN INDIGOBRIEF`
-      already shows.
+- [ ] Bring back `OPEN INDIGOBRIEF` with it, keeping its non-commercial
+      terms and credits (its text is in `assets/command-data.json` in git
+      history, up to 2026-11-11).
 
 ## The real //e
 
