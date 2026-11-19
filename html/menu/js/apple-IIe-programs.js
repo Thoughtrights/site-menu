@@ -512,7 +512,9 @@ PROGRAMS.baseball = (machine, url) => {
  * The mascot bounces over colour bars, drawn as dot densities the way a
  * monochrome monitor showed them. Each time it hits an edge, that edge
  * flashes on the same frame as Barzy's bounce sound, so an engineer can
- * see whether a stream's sound and picture land together.
+ * see whether a stream's sound and picture land together. While the
+ * drive loads him (seven seconds), a title card: Barzy flying in on a
+ * vapor trail of his colour bars.
  * payload: ["barzy", "<url of Barzy's assets/>"], on the same site. */
 PROGRAMS.barzy = (machine, assets) => {
     const ROWS = 20;            // graphics rows; three rows of text below
@@ -521,6 +523,10 @@ PROGRAMS.barzy = (machine, assets) => {
     const SPEEDS = [25, 40, 55, 75, 100, 130, 170, 220];
     const FLASH_MS = 100;       // how long an edge stays lit
     const SPRITE = { width: 56, height: 51 };
+    // Where his eye is in barzy-boi-trans.png (384 x 349): the centre, as a
+    // share of width and height, and the ring's and pupil's radii, as a
+    // share of width.
+    const EYE = { x: 192 / 384, y: 131 / 349, ring: 36 / 384, pupil: 12 / 384 };
     const LEVELS = 11;          // Barzy's audio level runs 0 to 11
     // 4x4 ordered dither: steady patterns, so the bars don't crawl.
     const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
@@ -616,9 +622,203 @@ PROGRAMS.barzy = (machine, assets) => {
 		const v = light[yy * w + xx];
 		const lit = d === 1 || (d > 2 && (v > 0.7 || (v > 0.35 && ((xx + yy) & 1))));
 		tones[yy * w + xx] = lit ? 1 : 2;
+		// His eye: a grey ring round a dark pupil, as bright as the green
+		// round it, so it would dither away. Drawn lit, with a dark rim.
+		const e = Math.hypot(xx + 0.5 - EYE.x * w, yy + 0.5 - EYE.y * h);
+		if (e < EYE.pupil * w + 0.25) {
+		    tones[yy * w + xx] = 2;
+		} else if (e < EYE.ring * w) {
+		    tones[yy * w + xx] = 1;
+		} else if (e < EYE.ring * w + 1) {
+		    tones[yy * w + xx] = 2;
+		}
 	    }
 	}
 	return { width: w, height: h, tones };
+    }
+
+    /* The splash, while the drive loads him: a matinee serial's title card,
+     * Barzy flying in on a vapor trail of his own colour bars. Near him the
+     * bars are a crisp ribbon; behind, they ripple, spread and fade, then
+     * break up into dust, with puffs of vapor rolling off and the odd
+     * glint. Drawn in grey on a canvas each frame and dithered to dots
+     * (ordered dither for the ribbon, shifting grain for the dust), then
+     * Barzy stamped on top in his three tones. Runs until stop(). */
+    const SPLASH_MS = 7000;
+    const HERO = { width: 84, height: 77 };
+    const SPLASH_TEXT = ['CHAPTER 1:  THE CASE OF THE LATE BEEP',
+			 'STARRING BARZY, AUDIO-VISUAL',
+			 'CALIBRATION TOOL.'];
+    const BAR_LUMAS = ['c0c0c0', 'ffff00', '00ffff', '00ff00', 'ff00ff', 'ff0000', '0000ff']
+	  .map((hex) => {
+	      const n = parseInt(hex, 16);
+	      return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+	  });
+
+    function splash(heroBitmap) {
+	const page = machine.graphics.screen(ROWS);
+	const { width: w, height: h, dots } = page;
+	const canvas = document.createElement('canvas');
+	canvas.width = w;
+	canvas.height = h;
+	const g = canvas.getContext('2d', { willReadFrequently: true });
+	const grey = (v, a = 1) => {
+	    const c = Math.round(Math.min(1, v) * 255);
+	    return 'rgba(' + c + ',' + c + ',' + c + ',' + a + ')';
+	};
+	const FONT = '"Arial Black", Impact, "Helvetica Neue", sans-serif';
+	const hero = makeSprite(heroBitmap);
+	const hx = 182, hy = 68;      // where Barzy is; he bobs from there
+	const tail = hx + 30;         // the trail starts behind the saucer
+	const noise = (x, y, seed) => {
+	    let n = (x * 374761393 + y * 668265263 + seed * 982451653) | 0;
+	    n = Math.imul(n ^ (n >>> 13), 1274126177);
+	    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+	};
+
+	// The title, drawn once: THE ADVENTURES OF, then BARZY in comic
+	// lettering, a solid outline round a half-lit fill.
+	const titles = document.createElement('canvas');
+	titles.width = w;
+	titles.height = h;
+	const tg = titles.getContext('2d');
+	tg.textAlign = 'center';
+	tg.textBaseline = 'middle';
+	tg.font = '900 11px ' + FONT;
+	tg.fillStyle = '#fff';
+	tg.fillText('THE ADVENTURES OF', 140, 12);
+	tg.save();
+	tg.translate(140, 40);
+	tg.transform(1, 0, -0.15, 1, 0, 0);
+	tg.font = '900 40px ' + FONT;
+	tg.lineJoin = 'round';
+	tg.lineWidth = 4;
+	tg.strokeStyle = '#fff';
+	tg.strokeText('BARZY', 0, 0);
+	tg.fillStyle = grey(0.5);
+	tg.fillText('BARZY', 0, 0);
+	tg.restore();
+
+	const puffs = [];             // vapor rolling off the ribbon
+	let lastPuff = 0;
+	let running = true;
+	const started = performance.now();
+	let last = started;
+
+	function frame(now) {
+	    if (!running || !machine.running()) {
+		return;
+	    }
+	    const s = (now - started) / 1000;
+	    const dt = Math.min(0.1, (now - last) / 1000);
+	    last = now;
+	    const bob = Math.sin(s * 3.1) * 2.5;
+	    const mid = hy + 40 + bob; // the ribbon leaves the saucer's middle
+
+	    g.globalCompositeOperation = 'source-over';
+	    g.fillStyle = '#000';
+	    g.fillRect(0, 0, w, h);
+	    g.drawImage(titles, 0, 0);
+
+	    // The ribbon: one column at a time, from the saucer backwards. The
+	    // ripple travels back along it; the bars spread apart and dim.
+	    for (let xx = tail; xx >= 0; xx--) {
+		const t = (tail - xx) / tail;                 // 0 at him, 1 far behind
+		const ripple = Math.sin(xx / 13 + s * 7) * (1 + 6 * t) + Math.sin(xx / 31 - s * 2) * 3 * t;
+		const lag = bob * Math.min(1, t * 3);         // the far end lags his bobbing
+		const spacing = 5 + 2.5 * t;
+		const fade = 1 - 0.85 * Math.pow(t, 1.2);
+		const crisp = t < 0.45;                       // near him: sharp bands, dark gaps
+		const top = mid - lag + ripple - spacing * 3.5;
+		BAR_LUMAS.forEach((v, i) => {
+		    // Every bar shows on green: dim ones lifted, bright ones kept.
+		    g.fillStyle = grey((0.32 + 0.68 * v) * fade);
+		    const y0 = top + i * spacing;
+		    if (crisp) {
+			g.fillRect(xx, Math.round(y0), 1, Math.round(spacing) - 1);
+		    } else {
+			g.fillRect(xx, y0, 1, Math.ceil(spacing));
+		    }
+		});
+	    }
+
+	    // Puffs: born where the ribbon starts to fray, drifting back,
+	    // swelling and thinning out.
+	    if (now - lastPuff > 90) {
+		lastPuff = now;
+		puffs.push({
+		    x: hx - 60 - Math.random() * 40, y: mid - 14 + Math.random() * 28,
+		    r: 3 + Math.random() * 3, age: 0, life: 1.6 + Math.random() * 1.2,
+		    vx: -(35 + Math.random() * 30), vy: (Math.random() - 0.5) * 10,
+		});
+	    }
+	    g.globalCompositeOperation = 'lighter';
+	    for (const p of puffs) {
+		p.age += dt;
+		p.x += p.vx * dt;
+		p.y += p.vy * dt;
+		p.r += 7 * dt;
+		const a = Math.max(0, 1 - p.age / p.life) * 0.45;
+		const glow = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+		glow.addColorStop(0, grey(1, a));
+		glow.addColorStop(1, grey(1, 0));
+		g.fillStyle = glow;
+		g.beginPath();
+		g.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+		g.fill();
+	    }
+	    while (puffs.length && puffs[0].age > puffs[0].life) {
+		puffs.shift();
+	    }
+
+	    // To dots. Near him, the steady ordered dither; further back, a
+	    // grain that shifts every few frames, so the trail turns to dust.
+	    const pixels = g.getImageData(0, 0, w, h).data;
+	    const seed = Math.floor(s * 20);
+	    for (let yy = 0; yy < h; yy++) {
+		for (let xx = 0; xx < w; xx++) {
+		    const v = pixels[(yy * w + xx) * 4] / 255;
+		    // Only the trail turns to dust, not the title above it.
+		    const dust = xx < tail && yy > 58
+			  ? Math.min(1, Math.max(0, ((tail - xx) / tail - 0.5) * 2.2)) : 0;
+		    const order = BAYER[(yy & 3) * 4 + (xx & 3)];
+		    const threshold = dust ? order + (noise(xx, yy, seed) - order) * dust : order;
+		    dots[yy * w + xx] = v > threshold ? 1 : 0;
+		}
+	    }
+
+	    // Glints: a few lit crosses that wink on and off along the trail.
+	    for (let i = 0; i < 6; i++) {
+		const k = Math.floor(s * 6) + i * 7;
+		if (noise(k, i, 3) < 0.55) {
+		    continue;
+		}
+		const gx = Math.floor(noise(k, i, 1) * (hx - 10)) + 2;
+		const gy = Math.floor(mid - 18 + noise(k, i, 2) * 36);
+		for (const [ox, oy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+		    const px = gx + ox, py = gy + oy;
+		    if (px >= 0 && px < w && py >= 0 && py < h) {
+			dots[py * w + px] = 1;
+		    }
+		}
+	    }
+
+	    // Barzy, bobbing.
+	    const top = Math.round(hy + bob);
+	    for (let yy = 0; yy < hero.height; yy++) {
+		for (let xx = 0; xx < hero.width; xx++) {
+		    const tone = hero.tones[yy * hero.width + xx];
+		    const py = top + yy;
+		    if (tone && py >= 0 && py < h) {
+			dots[py * w + hx + xx] = tone === 1 ? 1 : 0;
+		    }
+		}
+	    }
+	    page.show();
+	    requestAnimationFrame(frame);
+	}
+	requestAnimationFrame(frame);
+	return { stop() { running = false; } };
     }
 
     function bounce(edge) {
@@ -692,15 +892,33 @@ PROGRAMS.barzy = (machine, assets) => {
     return {
 	allKeys: true, // every key comes to key(), at once
 	start() {
-	    machine.setPrompt(width() < 80 ? 'UP/DN LEVEL  L/R SPEED  Q '
-			      : 'UP/DOWN LEVEL   LEFT/RIGHT SPEED   SPACE MUTE   Q QUIT ');
 	    const quietly = (promise) => promise.catch(() => null); // no sound beats no Barzy
-	    return machine.work(Promise.all([
-		machine.graphics.bitmap(assets + 'barzy-boi-trans.png', SPRITE.width, SPRITE.height),
-		quietly(machine.sound.load(assets + 'bounce-left.wav')),
-		quietly(machine.sound.load(assets + 'bounce-right.wav')),
-		quietly(machine.sound.load(assets + 'bounce-topbottom.wav')),
-	    ])).then(([bitmap, left, right, topBottom]) => {
+	    const prompt = width() < 80 ? 'UP/DN LEVEL  L/R SPEED  Q '
+		  : 'UP/DOWN LEVEL   LEFT/RIGHT SPEED   SPACE MUTE   Q QUIT ';
+	    machine.setPrompt('');
+	    // The drive runs the whole time: the splash, then the rest of him.
+	    return machine.work((async () => {
+		const hero = await machine.graphics.bitmap(assets + 'barzy-boi-trans.png', HERO.width, HERO.height);
+		const shown = performance.now();
+		const card = splash(hero);
+		// Mixed mode: the picture, then three lines, the last on the prompt row.
+		const [first, second, third] = SPLASH_TEXT.map((text) => text.slice(0, width()));
+		machine.setPrompt(third);
+		machine.redraw([...Array(ROWS).fill(' '), first, second]);
+		const loaded = await Promise.all([
+		    machine.graphics.bitmap(assets + 'barzy-boi-trans.png', SPRITE.width, SPRITE.height),
+		    quietly(machine.sound.load(assets + 'bounce-left.wav')),
+		    quietly(machine.sound.load(assets + 'bounce-right.wav')),
+		    quietly(machine.sound.load(assets + 'bounce-topbottom.wav')),
+		]);
+		await machine.sound.pause(Math.max(0, SPLASH_MS - (performance.now() - shown)) / 1000);
+		card.stop();
+		return loaded;
+	    })()).then(([bitmap, left, right, topBottom]) => {
+		if (stopped || !machine.running()) {
+		    return;
+		}
+		machine.setPrompt(prompt);
 		Object.assign(sounds, { left, right, topBottom });
 		sprite = makeSprite(bitmap);
 		screen = machine.graphics.screen(ROWS);
@@ -715,6 +933,9 @@ PROGRAMS.barzy = (machine, assets) => {
 		machine.graphics.clear();
 		machine.exit();
 		return machine.print([' ']);
+	    }
+	    if (!screen) {
+		return; // still loading: only Q works
 	    }
 	    if (['ArrowUp', '+', '='].includes(name)) {
 		level = Math.min(LEVELS, level + 1);
