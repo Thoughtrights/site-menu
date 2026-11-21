@@ -31,6 +31,16 @@
 	"action": "alias",
 	"payload": ["BRUN BARZY"]
     },
+    "BRUN DEBT" : {
+	"action": "program",
+	"type": "B",
+	"sectors": 23,
+	"payload": ["debt", "/us-debt-counter/debt.js"]
+    },
+    "RUN DEBT" : {
+	"action": "alias",
+	"payload": ["BRUN DEBT"]
+    },
     "OPEN JOBPOST": {
 	"action": "print",
 	"type": "T",

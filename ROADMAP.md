@@ -89,6 +89,20 @@ mutes, Q quits. What's left:
       sound starts on the frame the edge lights, but the browser's own audio
       delay isn't allowed for.
 
+### US Debt Counter
+
+`BRUN DEBT` runs it on the Apple. A title card while the drive loads: a
+tycoon in a top hat between his money bags, coins raining down, tipping his
+hat. Then the counter in big lamp-board digits, ticking from the latest
+Treasury figure at the past year's average rate as the web page does, with
+the official figures under it. S switches to one person's share, C to a
+chart (R for 10, 20 or 50 years, or since 1790), Q quits. It reads
+`/us-debt-counter/debt.js`, which the server's daily job keeps fresh; on the
+dev server it comes from the public repository. What's left:
+
+- [ ] Who holds the debt (`holders.js`), left out: a page of it, or not?
+- [ ] A way to the web page.
+
 ### Resume: light, mostly writing
 
 - [ ] Write `RESUME.TXT`: the resume as wrapped plain text. It only exists as

@@ -6,11 +6,13 @@ __pycache__/
 html/menu/assets/disks/karateka.dsk
 
 # Local copies of other projects' files for programs on the dev server
-# (RUN BASEBALL, BRUN BARZY). The live site already has them; they belong
-# to the baseball-cards and barzy repositories, and tools/dev-server.py
-# fetches them from GitHub the first time they're asked for.
+# (RUN BASEBALL, BRUN BARZY, BRUN DEBT). The live site already has them;
+# they belong to the baseball-cards, barzy and us-debt-counter repositories,
+# and tools/dev-server.py fetches them from GitHub the first time they're
+# asked for.
 html/baseball-cards/
 html/barzy/
+html/us-debt-counter/
 
 # Written by deploy/deploy.sh at each deploy.
 html/menu/version.json

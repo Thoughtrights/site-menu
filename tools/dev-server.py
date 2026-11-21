@@ -22,6 +22,7 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
 PROJECTS = {  # web directory: where its files are on GitHub
     'baseball-cards': 'https://raw.githubusercontent.com/Thoughtrights/baseball-cards/main/',
     'barzy': 'https://raw.githubusercontent.com/Thoughtrights/barzy/main/',
+    'us-debt-counter': 'https://raw.githubusercontent.com/Thoughtrights/us-debt-counter/main/',
 }
 
 
@@ -37,12 +38,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def fetch_from_project(self):
         # Programs on the Apple read other projects' files, which the live
         # site has and this repository doesn't: /baseball-cards/ for RUN
-        # BASEBALL, /barzy/ for BRUN BARZY. The first time one is asked
-        # for, copy it from that project's public repository and keep it
-        # (both directories are gitignored). The card scans are 258 MB in
+        # BASEBALL, /barzy/ for BRUN BARZY, /us-debt-counter/ for BRUN
+        # DEBT. The first time one is asked for, copy it from that
+        # project's public repository and keep it (the directories are
+        # gitignored). The card scans are 258 MB in
         # all, so only the ones looked at come down.
         match = re.fullmatch(r'/([a-z-]+)/((?:[A-Za-z0-9_-]+/)?[A-Za-z0-9_-][A-Za-z0-9._-]*'
-                             r'\.(?:jpg|png|json|wav))', self.path.split('?')[0])
+                             r'\.(?:jpg|png|json|wav|js))', self.path.split('?')[0])
         if not match or match.group(1) not in PROJECTS:
             return
         project, name = match.groups()

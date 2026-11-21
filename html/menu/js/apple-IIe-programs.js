@@ -964,6 +964,716 @@ PROGRAMS.barzy = (machine, assets) => {
 };
 
 
+/* BRUN DEBT: the US national debt, ticking, from the web page at
+ * /us-debt-counter/ (its own repository). While the drive loads the
+ * figures, a title card: a tycoon in a top hat between his money bags,
+ * coins raining down, tipping his hat now and then. Then the counter: the
+ * latest Treasury figure plus the past year's average growth, worked out
+ * as the web page does, in big lamp-board digits, with the official
+ * figures under it. S switches to one person's share, C to a chart of the
+ * debt (R for a longer range), N back to the number, Q quits. Left out:
+ * the live Treasury check (the server's copy is refreshed daily) and who
+ * holds the debt.
+ * payload: ["debt", "<url of the counter's debt.js>"], on the same site. */
+PROGRAMS.debt = (machine, url) => {
+    const US_POPULATION = 343000000; // as the web page has it
+    const DAY = 864e5;
+    const YEAR = 365.25 * DAY;
+    const SPLASH_MS = 6500;
+    const SPLASH_ROWS = 20;       // graphics rows; three rows of text below
+    const NUMBER_ROWS = 6;        // the lamp board; the figures in text below
+    const CHART_ROWS = 20;
+    const LABEL_COLUMNS = 6;      // the chart's dollar labels, left of it
+    const RANGES = [[10, 'LAST 10 YEARS'], [20, 'LAST 20 YEARS'],
+		    [50, 'LAST 50 YEARS'], [Infinity, 'SINCE 1790']];
+    const SPLASH_TEXT = ['A TICKING TALE OF TRILLIONS.',
+			 "FIGURES FROM THE U.S. TREASURY'S",
+			 'DEBT TO THE PENNY.'];
+    // 4x4 ordered dither, as Barzy's title card has it.
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+    // The lamp board's characters, 5 x 7, one lamp per 1.
+    const GLYPHS = {
+	0: ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
+	1: ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+	2: ['01110', '10001', '00001', '00010', '00100', '01000', '11111'],
+	3: ['11111', '00010', '00100', '00010', '00001', '10001', '01110'],
+	4: ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
+	5: ['11111', '10000', '11110', '00001', '00001', '10001', '01110'],
+	6: ['00110', '01000', '10000', '11110', '10001', '10001', '01110'],
+	7: ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+	8: ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
+	9: ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
+	'$': ['00100', '01111', '10100', '01110', '00101', '11110', '00100'],
+	',': ['00', '00', '00', '00', '01', '01', '10'],
+	'.': ['0', '0', '0', '0', '0', '0', '1'],
+	'-': ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
+    };
+
+    let data = null;              // { rows, latest, yearAgo, rate } once loaded
+    let view = null;              // 'number' or 'chart'
+    let share = false;            // one person's share instead of the total
+    let range = 0;                // RANGES[range] on the chart
+    let screen = null;
+    let shown = '';               // what the lamp board shows now
+    let stopped = false;
+
+    const width = () => machine.columns();
+    const factor = () => share ? 1 / US_POPULATION : 1;
+    const center = (text) => {
+	const t = toAscii(text).slice(0, width());
+	return ' '.repeat(Math.max(0, Math.floor((width() - t.length) / 2))) + t;
+    };
+    const twoSided = (left, right) =>
+	  toAscii(left).slice(0, Math.max(0, width() - right.length - 1))
+	  .padEnd(Math.max(0, width() - right.length - 1)) + ' ' + right;
+
+    // Money, as the web page writes it.
+    function dollars(v, cents) {
+	const digits = cents ? 2 : 0;
+	return (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', {
+	    minimumFractionDigits: digits, maximumFractionDigits: digits });
+    }
+    function short(v, digits = 2) {
+	// $40.710T, $6.60B; under a million, in whole dollars.
+	const a = Math.abs(v);
+	const [size, letter] = a >= 1e12 ? [1e12, 'T'] : a >= 1e9 ? [1e9, 'B'] : a >= 1e6 ? [1e6, 'M'] : [1, ''];
+	if (!letter) {
+	    return dollars(v, a < 100);
+	}
+	return (v < 0 ? '-$' : '$') + (a / size).toFixed(digits) + letter;
+    }
+    const signed = (v, text) => (v < 0 ? '-' : '+') + text.replace(/^-/, '');
+    const day = (date) => {
+	// Treasury's figures are as of close of business, about 5pm Eastern.
+	const [y, m, d] = date.split('-').map(Number);
+	return Date.UTC(y, m - 1, d, 22);
+    };
+    const longDate = (t) => new Date(t).toLocaleDateString('en-US', {
+	month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).toUpperCase();
+
+    async function load() {
+	/* debt.js sets window.DEBT_SNAPSHOT to a JSON object: daily rows of
+	 * [date, total, held by the public, intragovernmental] since 1993,
+	 * and yearly rows of [date, total] back to 1790. */
+	const response = await fetch(url, { cache: 'no-cache' });
+	if (!response.ok) {
+	    throw new Error(url + ': ' + response.status);
+	}
+	const text = await response.text();
+	const snapshot = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+	const daily = snapshot.daily
+	      .filter((r) => r[1] > 0)
+	      .map(([date, total, pub, intra]) => ({ t: day(date), total, pub, intra }));
+	if (daily.length < 300) {
+	    throw new Error(url + ': too few figures');
+	}
+	const yearly = (snapshot.yearly || [])
+	      .map(([date, total]) => ({ t: day(date), total }))
+	      .filter((r) => r.total > 0 && r.t < daily[0].t);
+	const latest = daily[daily.length - 1];
+	const split = [...daily].reverse().find((r) => r.pub > 0 && r.intra > 0) || latest;
+	// The earliest figure at least a year before the latest, for the rate.
+	const yearAgo = daily.find((r) => r.t >= latest.t - 365 * DAY) || daily[0];
+	return {
+	    rows: [...yearly, ...daily].sort((a, b) => a.t - b.t),
+	    latest, split, yearAgo,
+	    rate: (latest.total - yearAgo.total) / (latest.t - yearAgo.t),
+	};
+    }
+
+    const estimate = () => data.latest.total + data.rate * (Date.now() - data.latest.t);
+
+    function valueAt(t) {
+	// The debt at time t, in a straight line between Treasury's figures.
+	const rows = data.rows;
+	let lo = 0, hi = rows.length - 1;
+	if (t <= rows[0].t) return rows[0].total;
+	if (t >= rows[hi].t) return rows[hi].total;
+	while (hi - lo > 1) {
+	    const mid = (lo + hi) >> 1;
+	    if (rows[mid].t <= t) lo = mid; else hi = mid;
+	}
+	const a = rows[lo], b = rows[hi];
+	return a.total + (b.total - a.total) * (t - a.t) / (b.t - a.t);
+    }
+
+    /* The title card: a tycoon in a top hat, cane in one hand, between his
+     * money bags on a bare floor, coins raining down behind them. Every few
+     * seconds he lifts his hat and winks. Drawn in grey on a canvas each
+     * frame and dithered to dots. Runs until stop(). */
+    function splash() {
+	const page = machine.graphics.screen(SPLASH_ROWS);
+	const { width: w, height: h, dots } = page;
+	const canvas = document.createElement('canvas');
+	canvas.width = w;
+	canvas.height = h;
+	const g = canvas.getContext('2d', { willReadFrequently: true });
+	const grey = (v) => {
+	    const c = Math.round(Math.min(1, v) * 255);
+	    return 'rgb(' + c + ',' + c + ',' + c + ')';
+	};
+	const FONT = '"Arial Black", Impact, "Helvetica Neue", sans-serif';
+	const GROUND = 158;
+	const CX = 140;               // the middle of him
+
+	// The title, drawn once, with a dotted shadow.
+	const title = document.createElement('canvas');
+	title.width = w;
+	title.height = h;
+	const tg = title.getContext('2d');
+	const words = 'THE NATIONAL DEBT';
+	let size = 22;
+	tg.font = '900 ' + size + 'px ' + FONT;
+	const across = tg.measureText(words).width;
+	if (across > 262) {
+	    size = Math.floor(size * 262 / across);
+	    tg.font = '900 ' + size + 'px ' + FONT;
+	}
+	tg.textAlign = 'center';
+	tg.textBaseline = 'middle';
+	tg.translate(CX, 14);
+	tg.transform(1, 0, -0.15, 1, 0, 0);
+	tg.fillStyle = grey(0.45);
+	tg.fillText(words, 2, 2);
+	tg.fillStyle = '#fff';
+	tg.fillText(words, 0, 0);
+
+	function shape(trace, fill, line = 2, stroke = '#fff') {
+	    // Trace a path, fill it, outline it (in white unless told).
+	    g.beginPath();
+	    trace();
+	    if (fill) {
+		g.fillStyle = fill;
+		g.fill();
+	    }
+	    if (line) {
+		g.lineWidth = line;
+		g.strokeStyle = stroke;
+		g.stroke();
+	    }
+	}
+
+	function bag(x, size, lift, squash) {
+	    // A sack of money: a round belly on the floor, a neck tied with
+	    // string, two ears of cloth above the knot, a $ on the front.
+	    const rx = size * (0.82 + squash);
+	    const ry = size * (0.7 - squash);
+	    const cy = GROUND - lift - ry;
+	    const neck = cy - ry - size * 0.12;
+	    shape(() => {
+		g.moveTo(x - size * 0.16, neck);
+		g.lineTo(x - size * 0.46, neck - size * 0.3);
+		g.lineTo(x, neck - size * 0.16);
+		g.lineTo(x + size * 0.46, neck - size * 0.3);
+		g.lineTo(x + size * 0.16, neck);
+		g.closePath();
+	    }, grey(0.55), 1.5);
+	    shape(() => {
+		g.moveTo(x - size * 0.16, neck);
+		g.lineTo(x - size * 0.3, cy - ry + 3);
+		g.lineTo(x + size * 0.3, cy - ry + 3);
+		g.lineTo(x + size * 0.16, neck);
+		g.closePath();
+	    }, grey(0.55), 1.5);
+	    shape(() => g.ellipse(x, cy, rx, ry, 0, 0, Math.PI * 2), grey(0.55), 2);
+	    shape(() => {
+		g.moveTo(x - size * 0.2, neck + 1);
+		g.lineTo(x + size * 0.2, neck + 1);
+	    }, null, 2.5);
+	    g.font = '900 ' + Math.round(size * 0.95) + 'px ' + FONT;
+	    g.textAlign = 'center';
+	    g.textBaseline = 'middle';
+	    g.lineJoin = 'round';
+	    g.lineWidth = 3;
+	    g.strokeStyle = '#000';
+	    g.strokeText('$', x, cy + 1);
+	    g.fillStyle = '#fff';
+	    g.fillText('$', x, cy + 1);
+	}
+
+	function arm(fromX, fromY, toX, toY) {
+	    // A sleeve, outlined, ending in a white glove.
+	    g.lineCap = 'round';
+	    shape(() => { g.moveTo(fromX, fromY); g.lineTo(toX, toY); }, null, 8);
+	    shape(() => { g.moveTo(fromX, fromY); g.lineTo(toX, toY); }, null, 4.5, grey(0.22));
+	    shape(() => g.arc(toX, toY, 4.5, 0, Math.PI * 2), '#fff', 1, '#000');
+	}
+
+	function tycoon(s) {
+	    const bob = Math.sin(s * 2.4) * 1.2;          // breathing
+	    const y = (v) => v + bob;
+	    const p = (s % 3.2) / 3.2;                    // every 3.2 s, his hat
+	    const tip = p > 0.55 && p < 0.9 ? Math.sin(Math.PI * (p - 0.55) / 0.35) : 0;
+	    const wiggle = Math.sin(s * 9) * 1.2;         // the moustache's curls
+
+	    // The cane, behind him.
+	    g.lineCap = 'round';
+	    shape(() => { g.moveTo(102, y(119)); g.lineTo(95, GROUND - 1); }, null, 2.5);
+	    shape(() => g.arc(108, y(119), 6, Math.PI, Math.PI * 2.15), null, 2.5);
+
+	    // Legs and shoes.
+	    for (const [leg, shoe] of [[124, 123], [147, 157]]) {
+		shape(() => g.rect(leg, y(146), 9, GROUND - 5 - y(146)), grey(0.22), 1.5);
+		shape(() => g.ellipse(shoe, GROUND - 4, 11, 4, 0, 0, Math.PI * 2), '#000', 2);
+	    }
+
+	    // The suit: a round belly, a white shirt front, two buttons and a
+	    // watch chain.
+	    shape(() => g.ellipse(CX, y(126), 30, 25, 0, 0, Math.PI * 2), grey(0.22), 2);
+	    shape(() => {
+		g.moveTo(CX - 11, y(102));
+		g.lineTo(CX + 11, y(102));
+		g.lineTo(CX, y(124));
+		g.closePath();
+	    }, '#fff', 0);
+	    for (const by of [131, 140]) {
+		shape(() => g.arc(CX, y(by), 2, 0, Math.PI * 2), '#fff', 0);
+	    }
+	    shape(() => {
+		g.moveTo(CX - 23, y(127));
+		g.quadraticCurveTo(CX - 12, y(139), CX, y(131));
+	    }, null, 1.2);
+	    shape(() => g.arc(CX - 23, y(127), 3, 0, Math.PI * 2), '#fff', 0);
+
+	    // His right arm (on our left) holds the cane.
+	    arm(CX - 24, y(110), 104, y(121));
+
+	    // Head: ears, a black face drawn in white lines.
+	    for (const side of [-1, 1]) {
+		shape(() => g.arc(CX + side * 18, y(86), 5, 0, Math.PI * 2), '#000', 2);
+	    }
+	    shape(() => g.arc(CX, y(84), 18, 0, Math.PI * 2), '#000', 2);
+	    // Eyes: on our left, a wink while the hat's up.
+	    if (tip > 0.3) {
+		shape(() => g.arc(CX - 7, y(81), 3, Math.PI, Math.PI * 2), null, 1.5);
+	    } else {
+		shape(() => g.ellipse(CX - 7, y(79), 3.5, 4.5, 0, 0, Math.PI * 2), '#fff', 0);
+		shape(() => g.arc(CX - 6, y(80), 1.8, 0, Math.PI * 2), '#000', 0);
+	    }
+	    shape(() => g.ellipse(CX + 7, y(79), 3.5, 4.5, 0, 0, Math.PI * 2), '#fff', 0);
+	    shape(() => g.arc(CX + 6, y(80), 1.8, 0, Math.PI * 2), '#000', 0);
+	    // Bushy brows, raised with the hat.
+	    for (const side of [-1, 1]) {
+		shape(() => {
+		    g.moveTo(CX + side * 12, y(74) - 2 * tip);
+		    g.lineTo(CX + side * 3, y(72) - 3 * tip);
+		}, null, 2.5);
+	    }
+	    // A round nose, a smile, and a big handlebar moustache.
+	    shape(() => g.arc(CX, y(98), 5, Math.PI * 0.15, Math.PI * 0.85), null, 1.5);
+	    for (const side of [-1, 1]) {
+		// Edged in black, so it stands clear of his chin.
+		shape(() => {
+		    g.moveTo(CX, y(91));
+		    g.quadraticCurveTo(CX + side * 11, y(87), CX + side * 20, y(92));
+		    g.quadraticCurveTo(CX + side * 27, y(95), CX + side * 25, y(86) + wiggle);
+		    g.quadraticCurveTo(CX + side * 30, y(99), CX + side * 16, y(99));
+		    g.quadraticCurveTo(CX + side * 6, y(99), CX, y(96));
+		    g.closePath();
+		}, '#fff', 1.5, '#000');
+	    }
+	    shape(() => g.arc(CX, y(88), 4.5, 0, Math.PI * 2), grey(0.65), 1.5);
+	    // The bow tie.
+	    shape(() => {
+		g.moveTo(CX, y(104));
+		g.lineTo(CX - 10, y(99));
+		g.lineTo(CX - 10, y(109));
+		g.closePath();
+		g.moveTo(CX, y(104));
+		g.lineTo(CX + 10, y(99));
+		g.lineTo(CX + 10, y(109));
+		g.closePath();
+	    }, '#000', 1.5);
+	    shape(() => g.arc(CX, y(104), 2.5, 0, Math.PI * 2), '#fff', 0);
+
+	    // The top hat: lifted and tilted while he tips it.
+	    const hatX = CX + 3 * tip;
+	    const hatY = y(67) - 12 * tip;
+	    const tilt = -0.3 * tip;
+	    g.save();
+	    g.translate(hatX, hatY);
+	    g.rotate(tilt);
+	    shape(() => {
+		g.moveTo(-15, 0);
+		g.lineTo(-17, -30);
+		g.lineTo(17, -30);
+		g.lineTo(15, 0);
+		g.closePath();
+	    }, '#000', 2);
+	    shape(() => g.rect(-15.5, -8, 31, 5), grey(0.7), 0);
+	    shape(() => { g.moveTo(-10, -26); g.lineTo(-9, -12); }, null, 1.5);   // a shine
+	    shape(() => g.ellipse(0, 0, 26, 4, 0, 0, Math.PI * 2), '#000', 2);
+	    g.restore();
+
+	    // His left arm (on our right): at his side, or up at the brim.
+	    const brimX = hatX + 24 * Math.cos(tilt);
+	    const brimY = hatY + 24 * Math.sin(tilt);
+	    const reach = Math.min(1, tip * 1.6);
+	    arm(CX + 24, y(110), CX + 36 + (brimX - CX - 36) * reach, y(136) + (brimY - y(136)) * reach);
+	}
+
+	const coins = [];
+	let lastCoin = 0;
+	let running = true;
+	const started = performance.now();
+	let last = started;
+
+	function frame(now) {
+	    if (!running || stopped || !machine.running()) {
+		return;
+	    }
+	    const s = (now - started) / 1000;
+	    const dt = Math.min(0.1, (now - last) / 1000);
+	    last = now;
+
+	    g.fillStyle = '#000';
+	    g.fillRect(0, 0, w, h);
+	    g.drawImage(title, 0, 0);
+	    g.fillStyle = '#fff';
+	    g.fillRect(0, GROUND, w, 1);  // the floor
+
+	    // Coins rain down either side of him, spinning, behind the bags.
+	    if (now - lastCoin > 110) {
+		lastCoin = now;
+		const left = Math.random() < 0.5;
+		coins.push({
+		    x: left ? 8 + Math.random() * 86 : 186 + Math.random() * 86,
+		    y: 28, vx: (Math.random() - 0.5) * 10, vy: 10 + Math.random() * 25,
+		    spin: Math.random() * 6, rate: 5 + Math.random() * 7,
+		});
+	    }
+	    for (const c of coins) {
+		c.vy += 160 * dt;
+		c.x += c.vx * dt;
+		c.y += c.vy * dt;
+		c.spin += c.rate * dt;
+		const face = Math.abs(Math.cos(c.spin));
+		shape(() => g.ellipse(c.x, c.y, Math.max(0.6, 3.5 * face), 3.5, 0, 0, Math.PI * 2), '#fff', 0);
+		if (face > 0.97) {    // a glint as it turns face on
+		    shape(() => {
+			g.moveTo(c.x - 6, c.y);
+			g.lineTo(c.x + 6, c.y);
+			g.moveTo(c.x, c.y - 6);
+			g.lineTo(c.x, c.y + 6);
+		    }, null, 1);
+		}
+	    }
+	    while (coins.length && coins[0].y > GROUND - 3) {
+		coins.shift();
+	    }
+
+	    // The bags: the big ones jiggle, the small ones hop.
+	    const hop = (phase) => Math.max(0, Math.sin(s * 5 + phase)) * 5;
+	    const jiggle = (phase) => Math.sin(s * 10 + phase) * 0.03;
+	    bag(46, 26, 0, jiggle(0));
+	    bag(80, 14, hop(0), 0);
+	    bag(234, 26, 0, jiggle(2));
+	    bag(198, 14, hop(Math.PI), 0);
+
+	    tycoon(s);
+
+	    const pixels = g.getImageData(0, 0, w, h).data;
+	    for (let yy = 0, i = 0; yy < h; yy++) {
+		for (let xx = 0; xx < w; xx++, i++) {
+		    dots[i] = pixels[i * 4] / 255 > BAYER[(yy & 3) * 4 + (xx & 3)] ? 1 : 0;
+		}
+	    }
+	    page.show();
+	    requestAnimationFrame(frame);
+	}
+	requestAnimationFrame(frame);
+	return { stop() { running = false; } };
+    }
+
+    /* The counter: a lamp board across the top, each lamp a 2 x 4 block of
+     * dots, in a frame; then the figures in text. */
+    function drawBoard(text) {
+	const { width: w, dots } = screen;
+	dots.fill(0);
+	const gap = 2;
+	const across = (step) => [...text].reduce(
+	    (n, c) => n + (GLYPHS[c] ? GLYPHS[c][0].length * step + gap : 0), -gap);
+	const step = across(3) <= w - 8 ? 3 : 2;
+	// Lamps touch top to bottom: a gap there fights the scanlines.
+	const lamp = { width: step - 1, height: 4 };
+	const top = 10;
+	let x = Math.floor((w - across(step)) / 2);
+	for (const c of text) {
+	    const glyph = GLYPHS[c];
+	    if (!glyph) {
+		continue;
+	    }
+	    glyph.forEach((row, gy) => {
+		for (let gx = 0; gx < row.length; gx++) {
+		    if (row[gx] !== '1') {
+			continue;
+		    }
+		    for (let yy = 0; yy < lamp.height; yy++) {
+			const at = (top + gy * 4 + yy) * w + x + gx * step;
+			dots.fill(1, at, at + lamp.width);
+		    }
+		}
+	    });
+	    x += glyph[0].length * step + gap;
+	}
+	// The frame round the board, with its corners cut.
+	const [left, right, upper, lower] = [2, w - 3, 3, 44];
+	dots.fill(1, upper * w + left + 2, upper * w + right - 1);
+	dots.fill(1, lower * w + left + 2, lower * w + right - 1);
+	for (let yy = upper + 2; yy <= lower - 2; yy++) {
+	    dots[yy * w + left] = 1;
+	    dots[yy * w + right] = 1;
+	}
+	for (const [cx, cy] of [[left + 1, upper + 1], [right - 1, upper + 1],
+				[left + 1, lower - 1], [right - 1, lower - 1]]) {
+	    dots[cy * w + cx] = 1;
+	}
+	screen.show();
+    }
+
+    function boardText() {
+	return share ? dollars(estimate() / US_POPULATION, true) : dollars(estimate(), false);
+    }
+
+    function numberLines() {
+	const { latest, split, yearAgo, rate } = data;
+	const f = factor();
+	const change = latest.total - yearAgo.total;
+	const percent = (v, digits = 1) => (v * 100).toFixed(digits) + '%';
+	const figure = (label, value, extra) => twoSided(label, value.padStart(10) + '  ' + extra.padStart(7));
+	const rateLine = share
+	      ? signed(rate, dollars(rate * DAY * f, true)) + ' PER DAY   ' +
+	      signed(rate, dollars(rate * 365 * DAY * f, false)) + ' PER YEAR'
+	      : signed(rate, dollars(rate * 1000, false)) + ' PER SECOND   ' +
+	      signed(rate, short(rate * DAY)) + ' PER DAY';
+	return [
+	    ...Array(NUMBER_ROWS).fill(' '),
+	    center(share ? 'YOUR SHARE OF THE DEBT, RIGHT NOW' : 'ESTIMATED U.S. NATIONAL DEBT, RIGHT NOW'),
+	    center(rateLine),
+	    ' ',
+	    twoSided(share ? 'OFFICIAL SHARE' : 'OFFICIAL TOTAL', dollars(latest.total * f, true)),
+	    twoSided(' ', 'AS OF ' + longDate(latest.t)),
+	    ' ',
+	    figure('HELD BY THE PUBLIC', short(split.pub * f, 3), percent(split.pub / split.total)),
+	    figure('INTRAGOVERNMENTAL', short(split.intra * f, 3), percent(split.intra / split.total)),
+	    figure('CHANGE, PAST YEAR', signed(change, short(change * f)),
+		   signed(change, percent(change / yearAgo.total, 2))),
+	    ' ',
+	    center(share ? 'THE DEBT, SPLIT 343 MILLION WAYS.'
+		   : 'ABOUT ' + dollars(latest.total / US_POPULATION, false) + ' A PERSON IN THE U.S.'),
+	    ' ',
+	    ' ',
+	    center('THE LATEST TREASURY FIGURE, PLUS THE'),
+	    center("PAST YEAR'S AVERAGE GROWTH: AN ESTIMATE."),
+	    center('SOURCE: U.S. TREASURY, DEBT TO THE PENNY'),
+	];
+    }
+
+    function scale(max) {
+	/* The chart's top and its gridlines: n steps of a round amount, n
+	 * dividing the 18 text rows the plot spans, so every gridline sits on
+	 * a row and its label beside it. The lowest top that fits. */
+	const steps = [];
+	for (let p = Math.floor(Math.log10(max)) - 2; p <= Math.ceil(Math.log10(max)); p++) {
+	    for (const m of [1, 2, 2.5, 5]) {
+		steps.push(m * Math.pow(10, p));
+	    }
+	}
+	let best = null;
+	for (const n of [9, 6, 3]) {
+	    for (const step of steps) {
+		if (n * step >= max && (!best || n * step < best.top)) {
+		    best = { n, step, top: n * step };
+		}
+	    }
+	}
+	return best;
+    }
+
+    function label(v) {
+	// $45T, $2.5T, $120K: short enough for the chart's margin.
+	const [size, letter] = v >= 1e12 ? [1e12, 'T'] : v >= 1e9 ? [1e9, 'B'] : v >= 1e6 ? [1e6, 'M']
+	      : v >= 1e3 ? [1e3, 'K'] : [1, ''];
+	return '$' + String(+(v / size).toFixed(1)) + letter;
+    }
+
+    function drawChart() {
+	/* The debt over the range, plotted from the left margin to the right
+	 * edge: a line with a light fill under it, dotted gridlines, ticks
+	 * for the years. Labels are text under the dots. */
+	const { width: w, dots } = screen;
+	const columns = width();
+	const f = factor();
+	const [years, title] = RANGES[range];
+	const t1 = data.latest.t;
+	const t0 = Math.max(data.rows[0].t, t1 - years * YEAR);
+	const x0 = Math.ceil(w * LABEL_COLUMNS / columns) + 1;
+	const x1 = w - 1;
+	const timeAt = (x) => t0 + (x - x0) / (x1 - x0) * (t1 - t0);
+	const xAt = (t) => x0 + (t - t0) / (t1 - t0) * (x1 - x0);
+	let max = 0;
+	for (let x = x0; x <= x1; x++) {
+	    max = Math.max(max, valueAt(timeAt(x)) * f);
+	}
+	const { n, step, top } = scale(max);
+	const yTop = 12, yBottom = 156;  // the middles of text rows 1 and 19
+	const yAt = (v) => Math.round(yBottom - v / top * (yBottom - yTop));
+	const lines = Array(22).fill(' ');
+
+	dots.fill(0);
+	for (let k = 0; k <= n; k++) {
+	    const row = 19 - k * 18 / n;
+	    const gy = row * 8 + 4;
+	    for (let x = x0; x <= x1; x += k ? 3 : 1) {
+		dots[gy * w + x] = 1;
+	    }
+	    lines[row] = label(k * step).padStart(LABEL_COLUMNS - 1);
+	}
+	let previous = null;
+	for (let x = x0; x <= x1; x++) {
+	    const y = yAt(valueAt(timeAt(x)) * f);
+	    for (let yy = y; yy < yBottom; yy++) {
+		if (!(x & 1) && !(yy & 1)) {
+		    dots[yy * w + x] = 1;
+		}
+	    }
+	    const from = previous === null ? y : previous;
+	    for (let yy = Math.min(from, y); yy <= Math.max(from, y); yy++) {
+		dots[yy * w + x] = 1;
+	    }
+	    previous = y;
+	}
+
+	// The years along the bottom: ticks on the dots, labels in row 20.
+	const span = (t1 - t0) / YEAR;
+	const every = span <= 12 ? 2 : span <= 25 ? 5 : span <= 60 ? 10 : 50;
+	const first = new Date(t0).getUTCFullYear();
+	const row = Array(columns).fill(' ');
+	let free = LABEL_COLUMNS;
+	for (let year = Math.ceil(first / every) * every; ; year += every) {
+	    const t = Date.UTC(year, 0, 1);
+	    if (t > t1) {
+		break;
+	    }
+	    if (t < t0) {
+		continue;
+	    }
+	    const x = Math.round(xAt(t));
+	    for (let yy = yBottom + 1; yy <= yBottom + 3; yy++) {
+		dots[yy * w + x] = 1;
+	    }
+	    const column = Math.round(x * columns / w) - 2;
+	    if (column >= free && column + 4 <= columns) {
+		row.splice(column, 4, ...String(year));
+		free = column + 5;
+	    }
+	}
+	screen.show();
+	lines[20] = row.join('');
+	lines[21] = twoSided((share ? 'YOUR SHARE, ' : 'TOTAL DEBT, ') + title,
+			     short(data.latest.total * f, share ? 0 : 2));
+	return lines;
+    }
+
+    function prompt() {
+	const narrow = width() < 80;
+	if (view === 'chart') {
+	    return narrow ? 'R RANGE  S SHARE  N NUMBER  Q ' : 'R RANGE   S YOUR SHARE   N NUMBER   Q QUIT ';
+	}
+	return narrow ? 'S SHARE  C CHART  Q QUIT ' : 'S YOUR SHARE   C CHART   Q QUIT ';
+    }
+
+    function showView(next) {
+	// Put up the number or the chart, on a fresh graphics screen.
+	const changed = next !== view;
+	view = next;
+	if (changed || !screen) {
+	    machine.graphics.clear();
+	    screen = machine.graphics.screen(view === 'chart' ? CHART_ROWS : NUMBER_ROWS);
+	}
+	machine.setPrompt(prompt());
+	if (view === 'chart') {
+	    machine.redraw(drawChart());
+	    return;
+	}
+	shown = '';
+	machine.redraw(numberLines());
+	if (changed) {
+	    requestAnimationFrame(tick);
+	}
+    }
+
+    function tick() {
+	if (stopped || !machine.running() || view !== 'number') {
+	    return;
+	}
+	const text = boardText();
+	if (text !== shown) {
+	    shown = text;
+	    drawBoard(text);
+	}
+	requestAnimationFrame(tick);
+    }
+
+    return {
+	allKeys: true, // every key comes to key(), at once
+	start() {
+	    machine.setPrompt('');
+	    // The drive runs the whole time: the title card, then the figures.
+	    return machine.work((async () => {
+		const began = performance.now();
+		const card = splash();
+		const [first, second, third] = SPLASH_TEXT.map((text) => text.slice(0, width()));
+		machine.setPrompt(third);
+		machine.redraw([...Array(SPLASH_ROWS).fill(' '), first, second]);
+		try {
+		    const loaded = await load();
+		    await machine.sound.pause(Math.max(0, SPLASH_MS - (performance.now() - began)) / 1000);
+		    return loaded;
+		} finally {
+		    card.stop();
+		}
+	    })()).then((loaded) => {
+		if (stopped || !machine.running()) {
+		    return;
+		}
+		data = loaded;
+		showView('number');
+	    });
+	},
+	key(name) {
+	    if (name === 'q' || name === 'Q' || name === 'Escape') {
+		stopped = true;
+		machine.graphics.clear();
+		machine.exit();
+		return machine.print([' ']);
+	    }
+	    if (!data) {
+		return; // still loading: only Q works
+	    }
+	    const k = name.length === 1 ? name.toUpperCase() : name;
+	    if (k === 'S') {
+		share = !share;
+		showView(view);
+	    } else if (k === 'C' && view !== 'chart') {
+		showView('chart');
+	    } else if (k === 'N' && view !== 'number') {
+		showView('number');
+	    } else if (view === 'chart' && (k === 'R' || k === 'ArrowRight')) {
+		range = (range + 1) % RANGES.length;
+		showView('chart');
+	    } else if (view === 'chart' && k === 'ArrowLeft') {
+		range = (range + RANGES.length - 1) % RANGES.length;
+		showView('chart');
+	    }
+	},
+	input() {
+	    // Every key goes to key(); nothing is typed at a prompt.
+	},
+    };
+};
+
+
 /* The telephone: what answers at each number (assets/phone-book.json) and
  * how a call sounds. Shared by the modem (PR#2) and RUN DEMONDIAL. */
 const PHONE_BOOK = 'assets/phone-book.json';
