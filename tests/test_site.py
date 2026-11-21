@@ -7,6 +7,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -136,7 +137,7 @@ class FilesTest(unittest.TestCase):
         self.assertEqual(page.count(self.BASE), 1)
         page = page.replace(self.BASE, '')
         self.assertEqual(re.findall(r'(?:src|href)="(/(?!/)[^"]*)"', page), [])
-        for name in ('apple-IIe.js', 'apple-IIe-programs.js'):
+        for name in ('apple-IIe.js', 'apple-IIe-programs.js', 'apple-IIe-protovision.js'):
             self.assertNotRegex(read('js', name), r"""['"]/menu/""", name)
 
     def test_emulator_files_exist(self):
@@ -154,6 +155,38 @@ class FilesTest(unittest.TestCase):
         # Apache won't run a CGI without this, and a careless copy loses it.
         mode = os.stat(os.path.join(MENU, 'proxy', 'gopher.cgi')).st_mode
         self.assertTrue(mode & stat.S_IXUSR)
+
+
+class PhoneBookTest(unittest.TestCase):
+    """What answers the modem: assets/phone-book.json and the systems behind
+    its numbers."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.book = {number: entry for number, entry in json.loads(read('assets', 'phone-book.json')).items()
+                    if not number.startswith('_')}
+
+    def test_numbers_are_in_the_block_for_fiction(self):
+        for number in self.book:
+            self.assertRegex(number, r'^555-01\d\d$')
+
+    def test_every_system_exists(self):
+        code = read('js', 'apple-IIe-programs.js') + read('js', 'apple-IIe-protovision.js')
+        defined = set(re.findall(r'^\s*SYSTEMS\.(\w+) =', code, re.M))
+        for number, entry in self.book.items():
+            if entry['answers'] == 'computer':
+                self.assertIn(entry['system'], defined, number)
+
+    def test_protovision_loads_after_the_systems(self):
+        page = read('apple-IIe.html')
+        self.assertLess(page.index('js/apple-IIe-programs.js'), page.index('js/apple-IIe-protovision.js'))
+
+    @unittest.skipUnless(shutil.which('node'), 'needs node')
+    def test_protovision_plays(self):
+        # The logon, the talk and every game, played with no browser.
+        result = subprocess.run(['node', os.path.join(HERE, 'play_protovision.js')],
+                                capture_output=True, text=True, timeout=240)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 class LinkTest(unittest.TestCase):

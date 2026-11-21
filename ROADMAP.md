@@ -295,8 +295,10 @@ reach the BBS and the other "places you connect to".
 ### WOPR: a computer that wants to play
 
 An homage to *WarGames* (1983): what its hero does is what this Apple is
-becoming. All of it original: the film's dialogue, its computer's name, its
-game list and its backdoor stay in the film; the experience is the homage.
+becoming. The war computer is **Protovision** (555-0166): its name, its back
+door (`joshua`, in any case) and the titles in its library are the film's.
+What it says, and each game as played here, is this site's own; the film's
+dialogue stays in the film.
 
 1. **Wardial** the 555-01xx block (the numbers set aside for fiction) and
    find a carrier that isn't on any list.
@@ -331,11 +333,28 @@ game list and its backdoor stay in the film; the experience is the homage.
       demon. Its banner says to log on as guest; the guest notes explain the
       demon, list other lines that answer, and say its namesake's first name
       opens the rest (`james`). Admin reads a short research log. Drafts.
-- [ ] **The war computer**, for playing the hero: original, not the film's
-      WOPR. It needs a name and a backdoor; then its voice, its games, the
-      big board and the unwinnable game.
-- [ ] The trail of clues to the backdoor, across the disk, the BBS and gopher.
-- [ ] The big board and the unwinnable game, on the graphics layer.
+- [x] **Protovision** (555-0166, `js/apple-IIe-protovision.js`): the war
+      computer. `HELP`, `HELP GAMES` and `LIST GAMES` answer anyone at the
+      logon; `joshua` gets in. Inside you can talk to it or type a game's
+      name, and all fifteen titles play, on a few shared engines: one deck
+      for Black Jack, Poker (five-card draw) and Gin Rummy; one trick table
+      for Hearts and Bridge (no auction: the contract is dealt); Checkers and
+      Chess with a look-ahead opponent; Falken's Maze; and one engine of
+      orders and outcomes for the six war titles.
+- [x] The big board: Global Thermonuclear War on a hi-res map of the world.
+      Pick a side and targets; naming none is the only way nobody loses.
+- [x] The unwinnable game: Tic-Tac-Toe with no players plays itself, then
+      every opening of the big game, and draws its own conclusion.
+- [ ] The trail of clues to the back door, across the disk, the BBS and
+      gopher. Today only the logon's `GUEST` reply hints at it (a back door
+      named for the designer's son), so it takes knowing the film.
+- [ ] Its voice (the browser's speech). Left out for now: speech isn't
+      silenced by the sound button the way tones are.
+- [ ] Bridge has no auction and Hearts no passing; Chess always queens a
+      pawn and has no draw by repetition. Add them if they're missed.
+- Tests: `tests/play_protovision.js` plays every game with seeded dice
+  and checks the chess rules against published move counts. Try other
+  seeds after changing a game.
 
 ### The Thoughtrights BBS
 
