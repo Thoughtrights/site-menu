@@ -30,6 +30,10 @@ menu. Built; what's left:
 
 - [ ] Turn it on for the live site: one `DirectoryIndex` line in Apache, in
       "The Apple as the front page" in INSTALLATION.md. Needs your go-ahead.
+- [ ] Turn on links straight to a program (`/brun/debt`, `/run/baseball`,
+      `/open/jobpost`) for the live site: two `RewriteRule` lines in Apache,
+      in "Links straight to a program" in INSTALLATION.md. Needs your
+      go-ahead. The dev server has them already.
 - [ ] Add `gopher://gopher.thoughtrights.com` to the line under the desk once the
       gopher server is live. (Browsers don't open gopher links themselves, so
       it's there to be seen and copied.)

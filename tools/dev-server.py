@@ -15,10 +15,14 @@ import os
 import re
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'html')
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
+# Links straight to a program, in any case: as LINK_PATH in apple-IIe.js
+# and the RewriteRule in INSTALLATION.md.
+LINK_PATH = re.compile(r'/(?:run|brun|open)/[A-Za-z0-9 .-]{1,30}/?', re.IGNORECASE)
 PROJECTS = {  # web directory: where its files are on GitHub
     'baseball-cards': 'https://raw.githubusercontent.com/Thoughtrights/baseball-cards/main/',
     'barzy': 'https://raw.githubusercontent.com/Thoughtrights/barzy/main/',
@@ -64,7 +68,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def translate_path(self, path):
         # The Apple is the front door, as Apache's DirectoryIndex makes it
         # on the server (INSTALLATION.md). /index.html is still the old page.
-        if path.split('?')[0] == '/':
+        # A link straight to a program (/brun/debt) is the Apple too, as
+        # Apache's RewriteRule makes it; the page reads the address.
+        if path.split('?')[0] == '/' or LINK_PATH.fullmatch(urllib.parse.unquote(path.split('?')[0])):
             return os.path.join(ROOT, 'menu', 'apple-IIe.html')
         return super().translate_path(path)
 

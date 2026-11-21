@@ -201,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
     }, (1000 * POWER_BUTTON_ALERT_SECONDS_START));
 
-    powerSwitch.addEventListener('click', togglePower);
+    powerSwitch.addEventListener('click', () => togglePower());
 
     // The button on the left speaker: all sound on or off.
     soundToggle = document.querySelector('.speaker__button');
@@ -255,7 +255,71 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   updateKeysZ();
   fitScene();
+
+  const linked = linkedCommand(window.location.pathname);
+  if (linked) {
+      followLink(linked);
+  }
 });
+
+/* Links straight to a program: /run/baseball, /brun/debt, /open/jobpost,
+ * in any case, a hyphen for each space (/brun/zork-iii). The server
+ * serves this page at those paths and the address stays as it is
+ * (INSTALLATION.md, "Links straight to a program"). The machine comes on
+ * without the boot, leans in to the screen and types the command, and DOS
+ * answers as if it had been typed: FILE NOT FOUND for a name it doesn't
+ * know. Any other address is the desk, as ever. */
+const LINK_PATH = /\/(run|brun|open)\/([A-Za-z0-9 .-]{1,30})\/?$/i;
+const LINK_TYPING_MS = 70;   // a key at a time, so you see what it typed
+
+function linkedCommand(path) {
+    let match;
+    try {
+	match = decodeURIComponent(path).match(LINK_PATH);
+    } catch (error) {
+	return null; // a malformed %-escape
+    }
+    if (!match) {
+	return null;
+    }
+    const verb = match[1].toUpperCase();
+    // A hyphen is a space (ZORK-III), unless a name really has one.
+    const tries = [match[2].replace(/-/g, ' '), match[2]].map((name) => normalizeCommand(verb + ' ' + name));
+    // RUN and BRUN both run the file: a link needn't know which type it is.
+    const other = { RUN: 'BRUN', BRUN: 'RUN' }[verb];
+    if (other) {
+	tries.push(...tries.map((command) => other + command.slice(verb.length)));
+    }
+    return tries.find((command) => resolveCommand(command)) || tries[0];
+}
+
+async function followLink(command) {
+    const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    togglePower(true);
+    if (!touchMode) {
+	setZoomed(true);
+    }
+    // Sound can't start until the visitor taps or presses a key; then it can.
+    const wake = () => audio && audioContext();
+    document.addEventListener('keydown', wake, { once: true });
+    document.addEventListener('pointerdown', wake, { once: true });
+    booting = true; // keys wait until the command is typed
+    await pause(ZOOM_SECONDS * 1000);
+    for (const character of command) {
+	if (!on) {
+	    return; // switched off while it typed
+	}
+	lines[line] += character;
+	render();
+	await pause(LINK_TYPING_MS);
+    }
+    if (!on) {
+	return;
+    }
+    booting = false;
+    processCommand(lines[line]);
+    render();
+}
 
 window.addEventListener('resize', () => {
     updateKeysZ();
@@ -270,7 +334,8 @@ window.addEventListener('resize', () => {
 });
 
 
-function togglePower() {
+function togglePower(quick = false) {
+    // quick: straight to the prompt, for a link to a program (followLink).
     bootedOnce = true; // Don't show the power button alert if clicked
     on = !on;
     if (on) {
@@ -280,6 +345,15 @@ function togglePower() {
 	powerLight.style.backgroundColor = POWER_ON_COLOR;
 	if (touchMode) {
 	    enterScreen();
+	}
+	if (quick) {
+	    // No boot text and no warm-up: the set is already warm.
+	    readFromFloppy(1);
+	    animateTerminalPowerOn(1);
+	    booting = false;
+	    clearTerminal();
+	    scheduleFlicker();
+	    return;
 	}
 	readFromFloppy(7);
 	animateTerminalPowerOn(4);

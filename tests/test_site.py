@@ -3,12 +3,15 @@
     python3 -m unittest discover tests
 """
 
+import importlib.util
 import json
 import os
 import re
 import stat
 import subprocess
+import sys
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MENU = os.path.join(HERE, '..', 'html', 'menu')
@@ -151,6 +154,57 @@ class FilesTest(unittest.TestCase):
         # Apache won't run a CGI without this, and a careless copy loses it.
         mode = os.stat(os.path.join(MENU, 'proxy', 'gopher.cgi')).st_mode
         self.assertTrue(mode & stat.S_IXUSR)
+
+
+class LinkTest(unittest.TestCase):
+    """Links straight to a program: /run/baseball, /brun/debt, /open/jobpost.
+    The same rule is written three times: in the page, the dev server and
+    the Apache config in INSTALLATION.md."""
+
+    RULE = '(run|brun|open)/[A-Za-z0-9 .-]{1,30}'  # as Apache has it
+    NAME = re.compile(r'[A-Za-z0-9 .-]{1,30}')
+
+    @classmethod
+    def setUpClass(cls):
+        raw = json.loads(read('assets', 'command-data.json'))
+        cls.commands = {normalize(name): entry for name, entry in raw.items()}
+        spec = importlib.util.spec_from_file_location(
+            'dev_server', os.path.join(HERE, '..', 'tools', 'dev-server.py'))
+        cls.dev_server = importlib.util.module_from_spec(spec)
+        with mock.patch.object(sys, 'argv', ['dev-server.py']):  # it reads its port
+            spec.loader.exec_module(cls.dev_server)
+
+    def serves_the_apple(self, path):
+        handler = object.__new__(self.dev_server.Handler)
+        handler.directory = self.dev_server.ROOT
+        return handler.translate_path(path) == os.path.join(self.dev_server.ROOT, 'menu', 'apple-IIe.html')
+
+    def test_the_rule_is_the_same_everywhere(self):
+        with open(os.path.join(HERE, '..', 'tools', 'dev-server.py'), encoding='utf-8') as f:
+            server = f.read()
+        with open(os.path.join(HERE, '..', 'INSTALLATION.md'), encoding='utf-8') as f:
+            install = f.read()
+        # The same verbs and names, in each one's own spelling.
+        self.assertTrue(r'\/(run|brun|open)\/([A-Za-z0-9 .-]{1,30})\/?$/i' in read('js', 'apple-IIe.js'))
+        self.assertTrue("r'/(?:run|brun|open)/[A-Za-z0-9 .-]{1,30}/?', re.IGNORECASE" in server)
+        self.assertEqual(install.count(self.RULE + '/?$" '), 2)  # prod and uat
+        self.assertEqual(install.count('apple-IIe.html [NC,L]'), 2)
+
+    def test_every_file_on_the_disk_can_be_linked(self):
+        for name, entry in self.commands.items():
+            verb, _, rest = name.partition(' ')
+            if 'type' in entry and verb in ('RUN', 'BRUN', 'OPEN'):
+                self.assertTrue(self.NAME.fullmatch(rest.replace(' ', '-')), name)
+
+    def test_dev_server_serves_links_in_any_case(self):
+        for path in ('/brun/debt', '/BRUN/Debt', '/Run/Baseball/', '/open/jobpost',
+                     '/brun/zork-iii', '/run/zork%20iii', '/brun/debt?x=1'):
+            self.assertTrue(self.serves_the_apple(path), path)
+
+    def test_dev_server_leaves_other_paths_alone(self):
+        for path in ('/menu/index.html', '/run', '/run/', '/load/debt', '/run/a/b',
+                     '/run/../menu/index.html', '/run/%3Cscript%3E'):
+            self.assertFalse(self.serves_the_apple(path), path)
 
 
 if __name__ == '__main__':

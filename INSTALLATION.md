@@ -55,6 +55,34 @@ live front page, so check it on the server first with
 
 The dev server already serves the Apple at http://localhost:8765/.
 
+### Links straight to a program (optional)
+
+`/run/baseball`, `/brun/debt` and `/open/jobpost` open the Apple already on
+and zoomed in, skip the boot, and type the command. Any case works
+(`/BRUN/Debt`), and a hyphen stands for a space (`/brun/zork-iii`). `RUN`
+and `BRUN` find the file either way. A name that isn't on the disk gets DOS's
+`FILE NOT FOUND`. Have Apache serve the Apple page at those addresses. In the
+site's `<VirtualHost>`:
+
+```apache
+RewriteEngine On
+RewriteRule "^/(run|brun|open)/[A-Za-z0-9 .-]{1,30}/?$" /menu/apple-IIe.html [NC,L]
+RewriteRule "^/menu-uat/(run|brun|open)/[A-Za-z0-9 .-]{1,30}/?$" /menu-uat/apple-IIe.html [NC,L]
+```
+
+The second line gives uat the same links under `/menu-uat/`. The address
+stays as typed, the page's `<base>` keeps its files coming from its mount,
+and the page reads the command from the address. `[NC]` makes the match
+case-insensitive. It needs `mod_rewrite` (`sudo a2enmod rewrite`). This
+changes the live server, so check it first with `sudo apache2ctl configtest`.
+
+The dev server already serves these, for example
+http://localhost:8765/brun/debt.
+
+Two things a link can't do: browsers keep sound off until the visitor taps
+or presses a key, and a phone shows its keyboard only once the screen is
+tapped.
+
 ## 2. The gopher proxy (`BRUN GOPHER`)
 
 Without this step everything else still works. `BRUN GOPHER` will print
