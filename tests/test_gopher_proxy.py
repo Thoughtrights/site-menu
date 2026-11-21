@@ -57,6 +57,11 @@ class ParsingTest(unittest.TestCase):
         self.assertEqual(gopher.parse_url('sdf.org:7070')['p'], 7070)
         self.assertIsNone(gopher.parse_url('http://evil/'))
 
+    def test_url_with_a_bare_trailing_slash(self):
+        # gopher://host:port/ is the top menu, the same as no slash.
+        place = gopher.parse_url('gopher://localhost:7070/')
+        self.assertEqual((place['t'], place['s'], place['h'], place['p']), ('1', '', 'localhost', 7070))
+
     def test_ascii(self):
         self.assertEqual(gopher.ascii('café “quoted” — ☃'), 'cafe "quoted" - ?')
 
@@ -111,6 +116,78 @@ class SafetyTest(unittest.TestCase):
         with mock.patch.object(gopher.socket, 'getaddrinfo', return_value=infos):
             self.assertEqual(gopher.public_address('example.org', 70)[1], ('93.184.216.34', 70))
 
+    def test_extra_holes_setting(self):
+        self.assertEqual(gopher.extra_holes('localhost:7070=Dungeoneer, Gopher.Example.org:7071'),
+                         {('localhost', 7070): 'Dungeoneer',
+                          ('gopher.example.org', 7071): 'Gopher.Example.org'})
+        self.assertEqual(gopher.extra_holes(''), {})
+        self.assertEqual(gopher.extra_holes('no-port=Name, :70=Nobody'), {})
+
+    def test_this_sites_own_hole_allowed_on_its_port_and_address(self):
+        infos = [(2, 1, 6, '', ('127.0.0.1', 7070))]
+        with mock.patch.object(gopher, 'EXTRA_HOLES', {('localhost', 7070): 'Dungeoneer'}), \
+             mock.patch.object(gopher.socket, 'getaddrinfo', return_value=infos):
+            self.assertEqual(gopher.public_address('LocalHost', 7070)[1], ('127.0.0.1', 7070))
+
+    def test_fetch_tries_the_next_address(self):
+        # localhost is often ::1 first; a server listening on 127.0.0.1
+        # alone must still be reached.
+        class FakeSocket:
+            def __init__(self, family, kind):
+                self.family = family
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                return False
+            def settimeout(self, _):
+                pass
+            def connect(self, address):
+                if address[0] == '::1':
+                    raise ConnectionRefusedError()
+            def sendall(self, _):
+                pass
+            def recv(self, _):
+                data, self.sent = (b'' if getattr(self, 'sent', False) else b'iHello\r\n.\r\n'), True
+                return data
+        addresses = [(10, ('::1', 7070, 0, 0)), (2, ('127.0.0.1', 7070))]
+        with tempfile.TemporaryDirectory() as state, \
+             mock.patch.object(gopher, 'STATE_DIR', state), \
+             mock.patch.object(gopher, 'allowed_addresses', return_value=addresses), \
+             mock.patch.object(gopher.socket, 'socket', FakeSocket):
+            self.assertIn('Hello', gopher.fetch('localhost', 7070, '/'))
+
+    def test_only_the_exact_hole_is_allowed(self):
+        # The same host on another port, and another private host on the
+        # hole's port, are refused as before.
+        with mock.patch.object(gopher, 'EXTRA_HOLES', {('localhost', 7070): 'Dungeoneer'}):
+            self.check_refused('localhost', port=22, addresses=('127.0.0.1',))
+            self.check_refused('internal.example', port=7070, addresses=('10.0.0.5',))
+
+
+class DmNotesTest(unittest.TestCase):
+    """Dungeoneer's profiles carry parts for the game master only."""
+
+    PROFILE = ['ORWYN MAEDUR', '------------', 'An elf with ink on her hands.', '',
+               'WHAT DRIVES THEM', '----------------', 'Debts.',
+               'Secret (for the DM): she forged the', "duke's seal.", '',
+               'Loyal to her sister.', '',
+               'DM NOTES', '--------', 'She will betray the party.', '',
+               'POSSESSIONS', '-----------', 'A quill.']
+
+    def test_dm_parts_left_out(self):
+        kept = gopher.without_dm_notes(self.PROFILE)
+        text = '\n'.join(kept)
+        self.assertNotIn('Secret', text)
+        self.assertNotIn('forged', text)
+        self.assertNotIn('DM NOTES', text)
+        self.assertNotIn('betray', text)
+        for still_there in ('ORWYN MAEDUR', 'Debts.', 'Loyal to her sister.', 'POSSESSIONS', 'A quill.'):
+            self.assertIn(still_there, text)
+
+    def test_ordinary_text_untouched(self):
+        lines = ['Line one', 'Line two', '', 'NOTES', '-----', 'Nothing secret here.']
+        self.assertEqual(gopher.without_dm_notes(lines), lines)
+
 
 @mock.patch.object(gopher, 'fetch', side_effect=fake_fetch)
 class ProgramTest(unittest.TestCase):
@@ -120,6 +197,13 @@ class ProgramTest(unittest.TestCase):
         self.assertIn('THOUGHTRIGHTS GOPHER', reply['print'])
         self.assertTrue(all(len(row) <= 40 for row in reply['print']))
         self.assertEqual(reply['prompt'], 'MORE? ')
+
+    def test_home_lists_this_sites_holes_first(self, _):
+        with mock.patch.object(gopher, 'EXTRA_HOLES', {('localhost', 7070): 'Dungeoneer'}):
+            items = gopher.home()
+        self.assertEqual(items[2], ('i', 'THIS SITE', '', '', 0))
+        self.assertEqual(items[3], ('1', 'Dungeoneer', '/', 'localhost', 7070))
+        self.assertEqual(gopher.home(), gopher.HOME)  # without the setting, unchanged
 
     def test_paging_then_choice(self, _):
         state = step(None, None)['state']

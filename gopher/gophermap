@@ -1,0 +1,21 @@
+!thoughtrights.com
+#
+# The thoughtrights.com gopher hole: gopher://gopher.thoughtrights.com/
+# Served by tools/gopher-server.py (see INSTALLATION.md section 3).
+# Only things that are gopher by nature: the web pages are on the web.
+# The Dungeoneer section is written by the character app into its own
+# folder, which the server shows at /dungeoneer (deploy/dungeoneer-gopher.md).
+# Fields are separated by ONE tab. Lines without a tab are plain text.
+#
+            * under renewed management *
+
+Founded on April 30 1995.
+
+1Dungeoneer	/dungeoneer
+    Strangers, taverns and names, made up on the spot.
+
+ELSEWHERE IN GOPHERSPACE
+1Floodgap Systems	/	gopher.floodgap.com	70
+1SDF Public Access UNIX	/	sdf.org	70
+
+wiz@thoughtrights.com

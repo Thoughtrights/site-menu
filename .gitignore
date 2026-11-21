@@ -1,1 +1,18 @@
 __pycache__/
+
+# Commercial disks: fine to keep a copy here, and deploy/deploy.sh sends it
+# to the server, but never commit one (the repository is public).
+# Listed in DISKS_NOT_SHIPPED in tests/test_site.py.
+html/menu/assets/disks/karateka.dsk
+
+# Local copies of other projects' files for programs on the dev server
+# (RUN BASEBALL, BRUN BARZY, BRUN DEBT). The live site already has them;
+# they belong to the baseball-cards, barzy and us-debt-counter repositories,
+# and tools/dev-server.py fetches them from GitHub the first time they're
+# asked for.
+html/baseball-cards/
+html/barzy/
+html/us-debt-counter/
+
+# Written by deploy/deploy.sh at each deploy.
+html/menu/version.json

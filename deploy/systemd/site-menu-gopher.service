@@ -1,0 +1,30 @@
+# The site's gopher hole, prod: gopher://gopher.thoughtrights.com/ (port 70).
+# tools/gopher-server.py, deployed by deploy/deploy.sh prod into
+# /home/ubuntu/build/site-menu. Its /dungeoneer section is the character
+# app's folder, /home/ubuntu/build/character/gopher (deploy/dungeoneer-gopher.md).
+# Install once (CI-CD-PLAN.md):
+#   sudo cp deploy/systemd/site-menu-gopher.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now site-menu-gopher
+# It runs as a throwaway unprivileged user that may bind port 70 and read
+# the build dir, and nothing else.
+
+[Unit]
+Description=thoughtrights.com gopher hole (prod, port 70)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/ubuntu/build/site-menu/gopher-server.py --root /home/ubuntu/build/site-menu/gopher --mount dungeoneer=/home/ubuntu/build/character/gopher --host gopher.thoughtrights.com --port 70
+Restart=on-failure
+DynamicUser=yes
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+
+[Install]
+WantedBy=multi-user.target

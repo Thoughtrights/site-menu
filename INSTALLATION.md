@@ -7,9 +7,12 @@ build step, no package to install, and no paid service behind it.
 | --- | --- | --- |
 | `html/` | The web root: `html/menu/` is served as `/menu/` | Yes |
 | `html/menu/proxy/gopher.cgi` | The `BRUN GOPHER` proxy (Python 3, standard library) | Yes, if you want GOPHER |
-| `tests/` | Offline tests for the proxy | No |
+| `gopher/` | The top of the gopher hole, `gopher://gopher.thoughtrights.com/`: Dungeoneer and gopherspace | Yes, if you run a gopher server |
+| `tools/gopher-server.py` | The gopher server for `gopher/` (Python 3.8+, standard library) | Yes, beside `gopher/` |
+| `tests/` | Offline tests: the proxy, the gopher server, the catalog and its files, the deploy script | No |
+| `deploy/` | `deploy.sh uat\|prod`, the gopher server's systemd units, and how to use them ([deploy/README.md](deploy/README.md)) | No |
 | `tools/dev-server.py` | Local server that also runs the CGI | No |
-| `README.md`, `ROADMAP.md`, `INSTALLATION.md` | Notes | No |
+| `README.md`, `ROADMAP.md`, `INSTALLATION.md`, `CI-CD-PLAN.md` | Notes | No |
 
 ## 1. The menu (static files)
 
@@ -26,6 +29,59 @@ visitor's browser, so it needs nothing on the server.
 
 The page is `/menu/apple-IIe.html`. `/menu/index.html` is the plain HTML
 menu.
+
+The Apple page names its address in one place, `<base href="/menu/">`, so
+that it also works as the front page; everything else is relative. To serve
+it somewhere else, change that line (`deploy/deploy.sh uat` does
+this for `/menu-uat/`; see [CI-CD-PLAN.md](CI-CD-PLAN.md)).
+
+### The Apple as the front page (optional)
+
+To open the site on the Apple at `/`, have Apache serve the Apple page for
+the root directory. In the site's `<VirtualHost>`:
+
+```apache
+<Directory /path/to/docroot>
+    DirectoryIndex /menu/apple-IIe.html index.html
+</Directory>
+```
+
+The address stays `/`, and the page's `<base>` keeps its files coming from
+`/menu/`. `/index.html` is still the old title page, and the line under the
+desk links the plain menu for search engines, screen readers and anyone in
+a hurry. To undo it, remove the line and reload Apache. This changes the
+live front page, so check it on the server first with
+`sudo apache2ctl configtest`.
+
+The dev server already serves the Apple at http://localhost:8765/.
+
+### Links straight to a program (optional)
+
+`/run/baseball`, `/brun/debt` and `/open/jobpost` open the Apple already on
+and zoomed in, skip the boot, and type the command. Any case works
+(`/BRUN/Debt`), and a hyphen stands for a space (`/brun/zork-iii`). `RUN`
+and `BRUN` find the file either way. A name that isn't on the disk gets DOS's
+`FILE NOT FOUND`. Have Apache serve the Apple page at those addresses. In the
+site's `<VirtualHost>`:
+
+```apache
+RewriteEngine On
+RewriteRule "^/(run|brun|open)/[A-Za-z0-9 .-]{1,30}/?$" /menu/apple-IIe.html [NC,L]
+RewriteRule "^/menu-uat/(run|brun|open)/[A-Za-z0-9 .-]{1,30}/?$" /menu-uat/apple-IIe.html [NC,L]
+```
+
+The second line gives uat the same links under `/menu-uat/`. The address
+stays as typed, the page's `<base>` keeps its files coming from its mount,
+and the page reads the command from the address. `[NC]` makes the match
+case-insensitive. It needs `mod_rewrite` (`sudo a2enmod rewrite`). This
+changes the live server, so check it first with `sudo apache2ctl configtest`.
+
+The dev server already serves these, for example
+http://localhost:8765/brun/debt.
+
+Two things a link can't do: browsers keep sound off until the visitor taps
+or presses a key, and a phone shows its keyboard only once the screen is
+tapped.
 
 ## 2. The gopher proxy (`BRUN GOPHER`)
 
@@ -100,6 +156,7 @@ Both are environment variables, set with `SetEnv` as above.
 | --- | --- | --- |
 | `GOPHER_ALLOWED_ORIGINS` | `https://www.thoughtrights.com https://thoughtrights.com` | Pages allowed to use the proxy, separated by spaces. Set it if the menu is served from another host name. |
 | `GOPHER_STATE_DIR` | `/tmp/site-menu-gopher` | Where the 10-minute page cache and the per-visitor rate counts are kept. |
+| `GOPHER_EXTRA_HOLES` | (none) | This site's own holes, which may be on another port or a private address: `host:port=Name`, comma-separated, such as `gopher.thoughtrights.com:7070=thoughtrights.com`. Only those exact pairs get past the public-address rule; they're listed first on `BRUN GOPHER`'s home menu, and the phone book's `"hole"` lines (DUNGEONEER, 555-0130) need them when not on port 70. The dev server sets `localhost:7070=thoughtrights.com`; CI-CD-PLAN.md has prod's and uat's. |
 
 The limits are constants at the top of `gopher.cgi`:
 
@@ -154,7 +211,116 @@ Last, boot the IIe, type `BRUN GOPHER`, and pick an item.
   `10.x`, `192.168.x` and the EC2 metadata address `169.254.169.254`, so a
   visitor can't use it to reach anything on your network.
 
-## 3. Local development
+## 3. Your own gopher server (`gopher://gopher.thoughtrights.com/`)
+
+The hole is gopher-only: the web pages are on the web server already.
+`gopher/gophermap` is its top menu, which links Dungeoneer and a few holes
+elsewhere in gopherspace. Dungeoneer's section, `/dungeoneer`, is the
+character app's own folder, written by its deploy and shown here with
+`--mount` (deploy/dungeoneer-gopher.md says what that app writes).
+`tools/gopher-server.py` serves it: a small gopher server using Python's
+standard library alone (3.8 and up), because Ubuntu 20.04 doesn't package
+Gophernicus. This is separate from the proxy in step 2: the proxy lets the
+IIe *visit* gopher, this *is* a gopher server, reachable from any gopher
+client (Lagrange, Lynx, `curl gopher://...`, `BRUN GOPHER`).
+
+The server reads gophermaps in Gophernicus's format, so the hole would move
+to Gophernicus unchanged (on Ubuntu 24.04, `apt install gophernicus`,
+pointed at the same folder with `-r` and given the host name with `-h`).
+
+### What the server needs
+
+- `python3` (Ubuntu 20.04 has 3.8), for the server and Dungeoneer's programs.
+- **DNS:** `gopher.thoughtrights.com` pointing at the EC2 host.
+- **Inbound** TCP port 70 (prod) and 7070 (uat) in the EC2 security group,
+  from 0.0.0.0/0. The server listens on IPv4.
+
+### Steps
+
+1. **Deploy as usual.** `deploy/deploy.sh` copies `gopher/` and, beside it,
+   `gopher-server.py` into the build dir (`/home/ubuntu/build/site-menu`
+   or `site-menu-uat`), so the server's own source isn't in the hole.
+
+2. **Install the systemd units,** once. They run the server as a throwaway
+   unprivileged user that may bind its port and read the build dir:
+
+   ```bash
+   sudo cp deploy/systemd/site-menu-gopher.service deploy/systemd/site-menu-gopher-uat.service /etc/systemd/system/
+   ```
+
+   ```bash
+   sudo systemctl daemon-reload
+   ```
+
+   ```bash
+   sudo systemctl enable --now site-menu-gopher site-menu-gopher-uat
+   ```
+
+   Each unit names the build dir, the port, Dungeoneer's folder
+   (`--mount dungeoneer=/home/ubuntu/build/character/gopher`, or
+   `character-uat` for uat), and the host name its menus carry
+   (`--host gopher.thoughtrights.com`; without it, links would carry the
+   machine's own EC2 name, which clients can't follow). The unprivileged
+   user needs to get into `/home/ubuntu`: `ls -ld /home/ubuntu` should
+   show `x` for others, as Ubuntu 20.04 sets it by default.
+
+3. **Open ports 70 and 7070** inbound in the instance's security group.
+
+4. **Logs:** one line per request, `journalctl -u site-menu-gopher`.
+   After a deploy that changes `gopher-server.py`, restart the unit
+   (`sudo systemctl restart site-menu-gopher`); changes to the hole itself
+   need no restart, and neither do Dungeoneer's deploys. Until the
+   character app's first deploy, `/dungeoneer` answers "Not here."
+
+To try it locally, with a checkout of the character app beside this one:
+
+```bash
+python3 tools/gopher-server.py --root gopher --mount dungeoneer=../character/gopher --host localhost --port 7070
+```
+
+```bash
+curl -s gopher://localhost:7070/1/dungeoneer
+```
+
+The dev server already lets the Apple's DUNGEONEER line (555-0130) reach
+`localhost:7070`.
+
+### Check it
+
+From anywhere:
+
+```bash
+printf '\r\n' | nc gopher.thoughtrights.com 70 | head
+```
+
+```bash
+printf '/dungeoneer\r\n' | nc gopher.thoughtrights.com 70 | head
+```
+
+The first should print the menu, starting with the line for the title
+(`ithoughtrights.com`, a tab, `TITLE`). The second should print
+Dungeoneer's menu (or "Not here." before its first deploy). Then dial
+555-0130 on the Apple, and try `BRUN GOPHER` and
+`G gopher://gopher.thoughtrights.com`.
+
+### Adding to it
+
+- **Links** are lines of `type`, name, tab, selector (and optionally
+  tab, host, tab, port). Lines with no tab are plain text. `#` starts a
+  comment and `!` gives the menu a title (the format is Gophernicus's).
+  Keep it to gopher: the web pages have the web server.
+- **Text** goes in as files (`0About this site`, a tab, `/about.txt`).
+- **Programs** go in `cgi-bin/`. A type 7 item sends what the visitor
+  typed in `QUERY_STRING`, and `cgi-bin/name/more` passes `/more` in
+  `PATH_INFO`; whatever the script prints is the reply,
+  either a menu (lines with tabs, ending in `.`) or plain text for a
+  type 0 item. Treat that input as hostile.
+- To be added to Floodgap's list of new servers once it's up, write to
+  gopher@floodgap.com.
+
+The files are offline-tested with `python3 -m unittest discover tests`.
+
+## 4. Local development
 
 You need Python 3 and nothing else.
 
@@ -168,17 +334,26 @@ proxy to accept `localhost` as an origin, so `BRUN GOPHER` works against the
 real gopher servers. In the Claude desktop app, a `site` entry in
 `.claude/launch.json` starts the same server.
 
-The proxy tests don't use the network:
+The tests cover the proxy and check that the catalog, its programs and the
+files they need all fit together. They don't use the network:
 
 ```bash
 python3 -m unittest discover tests
 ```
 
+GitHub Actions runs them on every pull request and every push to `master`, and
+also checks that the JavaScript parses (`.github/workflows/checks.yml`). A
+`boot` entry whose disk we may not redistribute in git must be listed in
+`DISKS_NOT_SHIPPED` in `tests/test_site.py` and in `.gitignore`. The tests
+then check that the disk is never committed; a copy in your working tree is
+fine, and is what `deploy/deploy.sh` sends to the server. Every
+other disk is in git.
+
 To try phone mode, open the page in a phone-sized window with touch
 emulation, such as a browser's device toolbar. Phone mode only switches on
 for touch screens without a mouse.
 
-## 4. Changing what's on the disk
+## 5. Changing what's on the disk
 
 Commands, files and programs come from `html/menu/assets/command-data.json`.
 There's nothing to build after editing it; just deploy the file again.
@@ -213,9 +388,11 @@ There's nothing to build after editing it; just deploy the file again.
 live in `html/menu/assets/disks/` and are plain files, so deploying them is
 the same `rsync` as the rest of the menu. `.dsk`, `.do` and `.po` work.
 
-`BRUN CASTLE WOLFENSTEIN` expects `assets/disks/castle-wolfenstein.dsk`,
-which isn't in the repository; until it's there, the command prints
-`I/O ERROR`. To add another disk, copy the file in and add an entry like:
+Disks we may redistribute (Eamon, ProDOS) are in the repository.
+`BRUN KARATEKA` expects `assets/disks/karateka.dsk`, which is deliberately
+not: the repository is public, and `.gitignore` keeps it out. Keep your own
+copy there and it goes to the server with each deploy; until a file is
+there, the command prints `I/O ERROR`. To add another disk, copy the file in and add an entry like:
 
 ```json
 "BRUN MY GAME" : {
@@ -225,6 +402,11 @@ which isn't in the repository; until it's there, the command prints
 	"payload": ["assets/disks/my-game.dsk"]
 }
 ```
+
+Add `"save": true` to a disk that the program writes to, as Eamon writes
+your character. While it runs, the disk is saved to the visitor's browser
+every 20 seconds and at power off, and the next boot starts from the saved
+copy. Nothing is sent to the server.
 
 ### Getting disks
 

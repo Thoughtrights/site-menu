@@ -20,15 +20,16 @@ const MAX_LINE_LENGTH = 80; // columns on screen; longer lines wrap
 const MAX_INPUT_LENGTH = 240; // the prompt plus 239 typed characters, as on the real thing
 const MAX_ROWS = 22;
 const OUTPUT_SPEED = 350;
+const SCREEN_DRAW_SPEED = 15; // a program drawing its own screen: ms a line
 const COMMAND_JSON = 'assets/command-data.json';
 const REDIRECT_SECONDS = 7;
 const MAX_SEQUENTIAL_SYNTAX_ERRORS = 3;
 const POWER_BUTTON_ALERT_SECONDS_START = 5; // start alerting the user after seconds if they haven't hit the power button
 const POWER_BUTTON_ALERT_SECONDS_STOP = 120; // just stop any alert if they haven't clicked
 const DOS_FILE_VERBS = ['RUN', 'BRUN', 'OPEN', 'LOAD', 'BLOAD', 'EXEC', 'READ'];
-const DESK_PARTS = '.monitor, .keyboard, .keyboard *, .floppy-drive, .floppy-drive *';
+const DESK_PARTS = '.monitor, .keyboard, .keyboard *, .floppy-drive, .floppy-drive *, .speaker, .speaker *';
 const ZOOM_SECONDS = 1.4;
-const FLICKER_WARM_UP_SECONDS = 60; // then the screen only flickers now and then:
+const FLICKER_WARM_UP_SECONDS = 20; // then the screen only flickers now and then:
 const FLICKER_EVERY_SECONDS = 60;    // a flicker every 60 seconds...
 const FLICKER_JITTER_SECONDS = 20;   // ...plus up to 20 more, so it never keeps time
 const FLICKERS = [                   // one of these, at random (apple-IIe.css)
@@ -75,6 +76,10 @@ let working = false;      // the program is waiting on the network
 
 // Timers that belong to the running machine. Power off cancels them all.
 let output = null;        // the listing being printed, if any
+let resumeOutput = null;  // a listing stopped at a full screen: call to go on
+let resumeKeys = null;    // the keys that go on (event.key), or null for any
+let graphicsCanvas = null;   // the graphics layer, once a program has drawn
+let graphicsGeneration = 0;  // bumped by clearGraphics(), so a late picture isn't drawn
 let redirectTimer = null;
 let powerOffTimer = null;
 let floppyTimer = null;
@@ -196,7 +201,16 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
     }, (1000 * POWER_BUTTON_ALERT_SECONDS_START));
 
-    powerSwitch.addEventListener('click', togglePower);
+    powerSwitch.addEventListener('click', () => togglePower());
+
+    // The button on the left speaker: all sound on or off.
+    soundToggle = document.querySelector('.speaker__button');
+    soundToggle.addEventListener('click', (event) => {
+	event.stopPropagation();
+	setSound(!soundOn);
+	soundToggle.blur(); // so the space bar and RETURN keep typing
+    });
+    setSound(soundOn);
 
     if (touchMode) {
 	setUpPhone();
@@ -241,7 +255,71 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   updateKeysZ();
   fitScene();
+
+  const linked = linkedCommand(window.location.pathname);
+  if (linked) {
+      followLink(linked);
+  }
 });
+
+/* Links straight to a program: /run/baseball, /brun/debt, /open/jobpost,
+ * in any case, a hyphen for each space (/brun/zork-iii). The server
+ * serves this page at those paths and the address stays as it is
+ * (INSTALLATION.md, "Links straight to a program"). The machine comes on
+ * without the boot, leans in to the screen and types the command, and DOS
+ * answers as if it had been typed: FILE NOT FOUND for a name it doesn't
+ * know. Any other address is the desk, as ever. */
+const LINK_PATH = /\/(run|brun|open)\/([A-Za-z0-9 .-]{1,30})\/?$/i;
+const LINK_TYPING_MS = 70;   // a key at a time, so you see what it typed
+
+function linkedCommand(path) {
+    let match;
+    try {
+	match = decodeURIComponent(path).match(LINK_PATH);
+    } catch (error) {
+	return null; // a malformed %-escape
+    }
+    if (!match) {
+	return null;
+    }
+    const verb = match[1].toUpperCase();
+    // A hyphen is a space (ZORK-III), unless a name really has one.
+    const tries = [match[2].replace(/-/g, ' '), match[2]].map((name) => normalizeCommand(verb + ' ' + name));
+    // RUN and BRUN both run the file: a link needn't know which type it is.
+    const other = { RUN: 'BRUN', BRUN: 'RUN' }[verb];
+    if (other) {
+	tries.push(...tries.map((command) => other + command.slice(verb.length)));
+    }
+    return tries.find((command) => resolveCommand(command)) || tries[0];
+}
+
+async function followLink(command) {
+    const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    togglePower(true);
+    if (!touchMode) {
+	setZoomed(true);
+    }
+    // Sound can't start until the visitor taps or presses a key; then it can.
+    const wake = () => audio && audioContext();
+    document.addEventListener('keydown', wake, { once: true });
+    document.addEventListener('pointerdown', wake, { once: true });
+    booting = true; // keys wait until the command is typed
+    await pause(ZOOM_SECONDS * 1000);
+    for (const character of command) {
+	if (!on) {
+	    return; // switched off while it typed
+	}
+	lines[line] += character;
+	render();
+	await pause(LINK_TYPING_MS);
+    }
+    if (!on) {
+	return;
+    }
+    booting = false;
+    processCommand(lines[line]);
+    render();
+}
 
 window.addEventListener('resize', () => {
     updateKeysZ();
@@ -256,7 +334,8 @@ window.addEventListener('resize', () => {
 });
 
 
-function togglePower() {
+function togglePower(quick = false) {
+    // quick: straight to the prompt, for a link to a program (followLink).
     bootedOnce = true; // Don't show the power button alert if clicked
     on = !on;
     if (on) {
@@ -266,6 +345,15 @@ function togglePower() {
 	powerLight.style.backgroundColor = POWER_ON_COLOR;
 	if (touchMode) {
 	    enterScreen();
+	}
+	if (quick) {
+	    // No boot text and no warm-up: the set is already warm.
+	    readFromFloppy(1);
+	    animateTerminalPowerOn(1);
+	    booting = false;
+	    clearTerminal();
+	    scheduleFlicker();
+	    return;
 	}
 	readFromFloppy(7);
 	animateTerminalPowerOn(4);
@@ -413,6 +501,26 @@ function setUpPhone() {
 	    phoneInput.value = ' ';
 	    return;
 	}
+	if (resumeOutput && on) {
+	    // The next screen: any key for CATALOG; a space for a text file
+	    // (RETURN works too, through the form below).
+	    const typed = phoneInput.value;
+	    phoneInput.value = '';
+	    if (!resumeKeys || typed.includes(' ')) {
+		resumeOutput();
+	    }
+	    return;
+	}
+	if (program && program.allKeys && acceptingInput()) {
+	    // A program that takes every key: each typed character is one.
+	    const typed = phoneInput.value;
+	    phoneInput.value = '';
+	    const current = program;
+	    for (const character of typed) {
+		runProgramStep(() => current.key(character));
+	    }
+	    return;
+	}
 	if (!acceptingInput()) {
 	    phoneInput.value = ''; // the machine is off or busy
 	    return;
@@ -435,7 +543,12 @@ function setUpPhone() {
 	    return;
 	}
 	phoneInput.value = '';
-	if (acceptingInput()) {
+	if (resumeOutput && on) {
+	    resumeOutput();
+	} else if (program && program.allKeys && acceptingInput()) {
+	    const current = program;
+	    runProgramStep(() => current.key('Enter'));
+	} else if (acceptingInput()) {
 	    processCommand(lines[line]);
 	    render();
 	}
@@ -714,6 +827,44 @@ function diskFiles() {
 const commands = loadCommands(COMMAND_JSON);
 const files = diskFiles();
 
+/* Text files a program writes to the disk (RUN DEMONDIAL's log, say).
+ * They show up in CATALOG and OPEN like any other, and are kept in this
+ * browser, so they're still there next time. */
+const SAVED_FILES = 'apple-IIe-files';
+
+function addDiskFile(name, textLines) {
+    const characters = textLines.reduce((total, text) => total + text.length + 1, 0);
+    commands[normalizeCommand('OPEN ' + name)] = {
+	action: 'print',
+	type: 'T',
+	sectors: Math.max(1, Math.ceil(characters / 256)),
+	payload: textLines,
+    };
+    files.add(normalizeCommand(name));
+}
+
+function saveDiskFile(name, textLines) {
+    addDiskFile(name, textLines);
+    try {
+	const saved = JSON.parse(window.localStorage.getItem(SAVED_FILES) || '{}');
+	saved[name] = textLines;
+	window.localStorage.setItem(SAVED_FILES, JSON.stringify(saved));
+    } catch (error) {
+	// not kept past this visit, which is fine
+    }
+}
+
+try {
+    const saved = JSON.parse(window.localStorage.getItem(SAVED_FILES) || '{}');
+    for (const name in saved) {
+	if (Array.isArray(saved[name])) {
+	    addDiskFile(name, saved[name].map(String));
+	}
+    }
+} catch (error) {
+    // nothing saved, or no storage
+}
+
 
 document.addEventListener('keyup', (event) => {
     // Let go of a key forwarded to the //e (see keydown).
@@ -763,6 +914,18 @@ document.addEventListener('keydown', (event) => {
 	return; // typing goes into the phone's text field; see setUpPhone()
     }
 
+    if (resumeOutput && on) {
+	// A full screen: any key shows the next (CATALOG), or only the keys
+	// the listing named (RETURN or space, for a text file).
+	if (!['Shift', 'Control', 'CapsLock'].includes(event.key)) {
+	    event.preventDefault();
+	    if (!resumeKeys || resumeKeys.includes(event.key)) {
+		resumeOutput();
+	    }
+	}
+	return;
+    }
+
     const isPrintable =
 	  (keycode > 47 && keycode < 58) || // number keys
 	  keycode == SPACEBAR ||
@@ -774,14 +937,26 @@ document.addEventListener('keydown', (event) => {
 	  (keycode > 218 && keycode < 223); // [\]' (in order)
     const isArrow = keycode > 36 && keycode < 41;
 
+    const isPageKey = event.key === 'PageUp' || event.key === 'PageDown';
+
     // The whole page is the keyboard: don't let these scroll the page,
     // move focus, or open Firefox's quick-find (' and /).
-    if (isPrintable || isArrow || keycode == TAB) {
+    if (isPrintable || isArrow || keycode == TAB || (isPageKey && program)) {
 	event.preventDefault();
     }
 
     if (!acceptingInput()) {
 	return; // the machine is off or busy
+    }
+
+    if (program && program.key &&
+	(isArrow || isPageKey || (program.allKeys && !['Shift', 'Control', 'CapsLock'].includes(event.key)))) {
+	// A program that takes these keys gets them straight away (a
+	// highlight bar, or a game), rather than waiting for RETURN.
+	event.preventDefault();
+	const current = program;
+	runProgramStep(() => current.key(event.key));
+	return;
     }
 
     if (isPrintable) {
@@ -807,7 +982,7 @@ function pushRedirect(url) {
 }
 
 function acceptingInput() {
-    return on && !booting && !output && !working;
+    return on && !booting && !output && !resumeOutput && !working;
 }
 
 function controlC() {
@@ -815,7 +990,7 @@ function controlC() {
     if (booting) {
 	return;
     }
-    if (output || program) {
+    if (output || resumeOutput || program) {
 	cancelOutput();
 	endProgram();
     } else if (redirectTimer) {
@@ -868,6 +1043,101 @@ function makeMachine(token) {
 	    // Prints the lines, then the prompt.
 	    return alive() ? showArrayData(textLines) : new Promise(() => {});
 	},
+	show(textLines) {
+	    // Clears the screen (Applesoft's HOME) and draws a whole screen
+	    // quickly, as a program's own display does, then the prompt.
+	    if (!alive()) {
+		return new Promise(() => {});
+	    }
+	    cancelOutput();
+	    lines.length = 0;
+	    return showArrayData(textLines, 0, SCREEN_DRAW_SPEED);
+	},
+	redraw(textLines) {
+	    // Replaces the screen at once, keeping anything half typed at the
+	    // prompt: for a key like an arrow, which shouldn't wait on a draw.
+	    if (!alive()) {
+		return;
+	    }
+	    cancelOutput();
+	    // With no prompt (RUN DEMONDIAL's, say) the last line can't be told
+	    // from the command just entered (]RUN DEMONDIAL), so nothing carries.
+	    const current = lines[lines.length - 1] || '';
+	    const typed = promptText && current.startsWith(promptText)
+		  ? current.slice(promptText.length) : '';
+	    lines.length = 0;
+	    lines.push(...textLines.map(toScreenText), promptText + typed);
+	    render();
+	},
+	inverse(text) {
+	    // A line shown dark on green, for a highlight bar.
+	    return INVERSE + text;
+	},
+	graphics: {
+	    // Hi-res dots over the text, in text-cell coordinates.
+	    clear() {
+		if (alive()) {
+		    clearGraphics();
+		}
+	    },
+	    picture(url, box) {
+		// box: { column, row, columns, rows }. Resolves once drawn.
+		return alive() ? drawPicture(url, box) : Promise.resolve();
+	    },
+	    screen(rows) {
+		// A dot buffer to draw on every frame; see graphicsScreen().
+		const screen = graphicsScreen(rows);
+		const show = screen.show;
+		screen.show = () => {
+		    if (alive()) {
+			show();
+		    }
+		};
+		return screen;
+	    },
+	    bitmap(url, width, height) {
+		// An image as brightness and coverage per dot, for sprites.
+		return loadBitmap(url, width, height);
+	    },
+	},
+	sound: {
+	    load: (url) => loadSound(url),
+	    play(sound, volume) {
+		if (alive()) {
+		    playSound(sound, volume);
+		}
+	    },
+	    // Each resolves when it has finished (at once if the program's over).
+	    tone: (frequencies, seconds, volume = 0.08) =>
+		alive() ? playTones(frequencies, seconds, volume) : Promise.resolve(),
+	    noise: (seconds, volume = 0.05) => alive() ? playNoise(seconds, volume) : Promise.resolve(),
+	    say: (text) => alive() ? say(text) : Promise.resolve(),
+	    pause: (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000)),
+	},
+	wait(promise) {
+	    // Input off until the promise settles, without the disk drive light.
+	    if (!alive()) {
+		return promise;
+	    }
+	    working = true;
+	    return promise.finally(() => {
+		if (alive()) {
+		    working = false;
+		}
+	    });
+	},
+	running: () => alive(), // false once the program is broken off: stop animating
+	saveFile(name, textLines) {
+	    // A text file on the disk, in CATALOG and OPEN-able, kept in this browser.
+	    if (alive()) {
+		saveDiskFile(name, textLines);
+	    }
+	},
+	readFile(name) {
+	    // A text file's lines (one saveFile wrote, or one OPEN shows), or null.
+	    const file = commands[normalizeCommand('OPEN ' + name)];
+	    return file && file.action === 'print' ? file.payload.map((text) => String(text).replace(/\n$/, '')) : null;
+	},
 	work(promise) {
 	    // Wait for the network with the drive light on and input off.
 	    if (!alive()) {
@@ -895,6 +1165,8 @@ function makeMachine(token) {
 function endProgram() {
     programToken++;
     program = null;
+    clearGraphics();
+    stopSounds();
     if (working) {
 	stopFloppy(); // broken off while it waited on the network
     }
@@ -926,18 +1198,53 @@ function startProgram(name, args) {
 }
 
 
-function bootDisk(disk) {
+/* Disks that keep their changes ("save": true in command-data.json, such as
+ * Eamon, which writes your character to its disk). While one runs it is
+ * saved to this browser every little while and at power off, and the next
+ * boot starts from the saved copy. */
+const SAVED_DISK = 'apple-IIe-disk:';
+const DISK_SAVE_SECONDS = 20;
+let diskSaveTimer = null;
+let savingDisk = null;      // the disk path being kept, while it runs
+
+function savedDisk(disk) {
+    try {
+	const text = window.localStorage.getItem(SAVED_DISK + disk);
+	return text ? Uint8Array.from(atob(text), (c) => c.charCodeAt(0)) : null;
+    } catch (error) {
+	return null;
+    }
+}
+
+function keepDisk(frame, disk) {
+    // Ask the //e for drive 1's disk and store it. Resolves either way.
+    if (!frame || !frame.contentWindow || !frame.contentWindow.menuDisk) {
+	return Promise.resolve();
+    }
+    return frame.contentWindow.menuDisk.save().then((buffer) => {
+	const bytes = new Uint8Array(buffer);
+	let text = '';
+	for (let i = 0; i < bytes.length; i += 0x8000) {
+	    text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+	}
+	window.localStorage.setItem(SAVED_DISK + disk, btoa(text));
+    }).catch((error) => console.log('disk not saved:', error));
+}
+
+function bootDisk(disk, options = {}) {
     /* Hand the screen to a real Apple //e: apple2js (MIT, apple2js/) in a
      * frame, booting `disk` in drive 1 and showing it in green. The menu's
      * DOS is gone until the power switch brings it back. A disk that isn't
-     * there is an I/O ERROR. */
+     * there is an I/O ERROR. With options.save, the disk keeps its changes
+     * (see SAVED_DISK). */
     endProgram();
     const token = programToken;
-    const url = new URL(disk, location.href).href;
+    const url = new URL(disk, document.baseURI).href; // under /menu/ even at /
+    const saved = options.save ? savedDisk(disk) : null;
     working = true;
     readFromFloppy(60);
     fetch(url, { method: 'HEAD' }).then((response) => {
-	if (!response.ok) {
+	if (!response.ok && !saved) {
 	    throw new Error(disk + ': ' + response.status);
 	}
 	if (token !== programToken || !on) {
@@ -946,7 +1253,23 @@ function bootDisk(disk) {
 	emulator = document.createElement('iframe');
 	emulator.className = 'monitor__emulator';
 	emulator.title = 'Apple //e';
-	emulator.src = 'apple2js/apple2jse.html?mono_screen=true&gl_canvas=false#' + url;
+	// The disk to boot is named after the #. A saved copy is handed over as
+	// a link to it in this page, ending in the disk's own file name, which
+	// is how apple2js tells the format (.dsk, .po).
+	let bootFrom = url;
+	if (saved) {
+	    const link = URL.createObjectURL(new Blob([saved], { type: 'application/octet-stream' }));
+	    bootFrom = link + '#' + disk.split('/').pop();
+	    setTimeout(() => URL.revokeObjectURL(link), 60 * 1000); // read long before then
+	}
+	emulator.src = 'apple2js/apple2jse.html?mono_screen=true&gl_canvas=false' +
+	    (soundOn ? '' : '&muted') + '#' + bootFrom;
+	const frame = emulator;
+	if (options.save) {
+	    savingDisk = disk;
+	    clearInterval(diskSaveTimer);
+	    diskSaveTimer = setInterval(() => keepDisk(frame, disk), DISK_SAVE_SECONDS * 1000);
+	}
 	if (!touchMode) {
 	    // On a phone the keys come from the phone keyboard instead.
 	    emulator.addEventListener('load', () => emulator && emulator.focus());
@@ -971,7 +1294,17 @@ function bootDisk(disk) {
 
 function stopEmulator() {
     if (emulator) {
-	emulator.remove();
+	const frame = emulator;
+	clearInterval(diskSaveTimer);
+	diskSaveTimer = null;
+	if (savingDisk) {
+	    // Keep the disk's last changes, then let the //e go.
+	    frame.style.display = 'none';
+	    keepDisk(frame, savingDisk).finally(() => frame.remove());
+	    savingDisk = null;
+	} else {
+	    frame.remove();
+	}
 	emulator = null;
 	document.body.classList.remove('emulating');
 	if (phoneInput) {
@@ -1036,17 +1369,24 @@ function processCommand(command) {
     if (["print", "redirect", "catalog", "program", "boot"].includes(action)) {
 	syntaxErrorCounter = 0;
 	if (action == "print") {
-	    showArrayData(commands[resolved]["payload"]);
+	    if (commands[resolved]["type"] === "T") {
+		// A text file: a screenful at a time, RETURN or space for more.
+		showArrayData(commands[resolved]["payload"], MAX_ROWS - 1, OUTPUT_SPEED,
+			      { keys: ['Enter', ' '], marker: true });
+	    } else {
+		showArrayData(commands[resolved]["payload"]);
+	    }
 	}
 	if (action == "catalog") {
-	    showArrayData(catalogListing(commands[resolved]["volume"] || 254));
+	    // A screenful at a time, with "]CATALOG" still at the top.
+	    showArrayData(catalogListing(commands[resolved]["volume"] || 254), MAX_ROWS);
 	}
 	if (action == "program") {
 	    const [name, ...args] = commands[resolved]["payload"];
 	    startProgram(name, args);
 	}
 	if (action == "boot") {
-	    bootDisk(commands[resolved]["payload"][0]);
+	    bootDisk(commands[resolved]["payload"][0], { save: Boolean(commands[resolved]["save"]) });
 	}
 	if (action == "redirect") {
 	    showArrayData([' ', 'CONFIRMED', ' ', 'You will be redirected in ' + REDIRECT_SECONDS.toString() + ' seconds.',
@@ -1115,30 +1455,387 @@ function animateKey(keyCode) {
 }
 
 const terminal = document.querySelector('.monitor__terminal');
+
+// A line that starts with this is shown in inverse video, dark on green,
+// as the IIe's own INVERSE did. Programs get it from machine.inverse().
+const INVERSE = '\u0001';
+
+function screenRows(text) {
+    // Long lines wrap onto the next screen row.
+    const length = text.startsWith(INVERSE) ? text.length - 1 : text.length;
+    return Math.max(1, Math.ceil(length / columns));
+}
+
 function render() {
 
-    // Long lines wrap onto the next screen row; drop whole lines off
-    // the top until the screen rows fit.
-    const screenRows = (text) => Math.max(1, Math.ceil(text.length / columns));
+    // Drop whole lines off the top until the screen rows fit.
     let rows = lines.reduce((total, text) => total + screenRows(text), 0);
     while (rows > MAX_ROWS + 1 && lines.length > 1) {
 	rows -= screenRows(lines.shift());
     }
     line = lines.length - 1;
 
-    terminal.innerHTML = '';
+    const screen = [];
     for (let i = 0; i < lines.length; i++) {
 	const lastLine = i === lines.length - 1;
-	for (let start = 0; start < lines[i].length || start === 0; start += columns) {
+	const inverse = lines[i].startsWith(INVERSE);
+	const text = inverse ? lines[i].slice(1) : lines[i];
+	for (let start = 0; start < text.length || start === 0; start += columns) {
 	    const divLine = document.createElement('div');
-	    divLine.textContent = lines[i].slice(start, start + columns);
-	    if (lastLine && start + columns >= lines[i].length) {
+	    if (inverse) {
+		const span = document.createElement('span');
+		span.className = 'inverse';
+		span.textContent = text.slice(start, start + columns);
+		divLine.appendChild(span);
+	    } else {
+		divLine.textContent = text.slice(start, start + columns);
+	    }
+	    if (lastLine && start + columns >= text.length) {
 		const cursor = document.createElement('span');
 		cursor.classList.add('cursor');
 		divLine.appendChild(cursor);
 	    }
-	    terminal.appendChild(divLine);
+	    screen.push(divLine);
 	}
+    }
+    if (graphicsCanvas) {
+	screen.push(graphicsCanvas); // the graphics layer stays over the text
+    }
+    terminal.replaceChildren(...screen);
+}
+
+/* The graphics layer: Apple hi-res dots over the text screen, lined up
+ * with it. One text cell is 7 dots wide and 8 high; on 80 columns each
+ * hi-res dot is two canvas pixels wide, as with the IIe's 80-column card.
+ * Programs reach it as machine.graphics. */
+function graphicsLayer() {
+    // The canvas, sized to the text grid as it is laid out right now.
+    if (!graphicsCanvas) {
+	graphicsCanvas = document.createElement('canvas');
+	graphicsCanvas.className = 'monitor__graphics';
+	graphicsCanvas.setAttribute('aria-hidden', 'true');
+	terminal.appendChild(graphicsCanvas);
+    }
+    const style = getComputedStyle(terminal);
+    const rows = MAX_ROWS + 1;
+    // Measure a whole screen of text: layout sizes (not the 3D-transformed
+    // ones), and whole pixels spread over every row and column, not one.
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre';
+    probe.textContent = Array(rows).fill('M'.repeat(columns)).join('\n');
+    terminal.appendChild(probe);
+    const cellWidth = probe.offsetWidth / columns;
+    const cellHeight = probe.offsetHeight / rows;
+    probe.remove();
+    const width = columns * 7;
+    const height = rows * 8;
+    if (graphicsCanvas.width !== width || graphicsCanvas.height !== height) {
+	graphicsCanvas.width = width;
+	graphicsCanvas.height = height;
+    }
+    Object.assign(graphicsCanvas.style, {
+	left: style.paddingLeft,
+	top: style.paddingTop,
+	width: (columns * cellWidth) + 'px',
+	height: (rows * cellHeight) + 'px',
+    });
+    return { canvas: graphicsCanvas, cellWidth, cellHeight, dotWidth: columns === 80 ? 2 : 1 };
+}
+
+function clearGraphics() {
+    graphicsGeneration++;
+    if (graphicsCanvas) {
+	graphicsCanvas.getContext('2d').clearRect(0, 0, graphicsCanvas.width, graphicsCanvas.height);
+    }
+}
+
+function loadImage(url) {
+    // The load event, not image.decode(), which a browser may put off
+    // while the page is in the background.
+    return new Promise((resolve, reject) => {
+	const image = new Image();
+	image.onload = () => resolve(image);
+	image.onerror = () => reject(new Error(url + ': not loaded'));
+	image.src = url;
+    });
+}
+
+async function drawPicture(url, box) {
+    /* A whole photo, dithered to green hi-res dots and scaled to fit,
+     * centred in a box of text cells: { column, row, columns, rows }. */
+    const generation = graphicsGeneration;
+    const image = await loadImage(url);
+    if (generation !== graphicsGeneration || !on) {
+	return; // the screen moved on while it loaded
+    }
+    const { canvas, cellWidth, cellHeight, dotWidth } = graphicsLayer();
+    const source = { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
+    // Keep the photo's shape on screen: a dot is not square.
+    const dotAspect = (cellWidth / 7 * dotWidth) / (cellHeight / 8);
+    const boxWidth = Math.floor(box.columns * 7 / dotWidth);
+    const boxHeight = box.rows * 8;
+    let height = boxHeight;
+    let width = Math.round(height * (source.width / source.height) / dotAspect);
+    if (width > boxWidth) {
+	width = boxWidth;
+	height = Math.round(width * dotAspect * source.height / source.width);
+    }
+    const work = document.createElement('canvas');
+    work.width = width;
+    work.height = height;
+    const workContext = work.getContext('2d', { willReadFrequently: true });
+    workContext.drawImage(image, source.x, source.y, source.width, source.height, 0, 0, width, height);
+    const pixels = workContext.getImageData(0, 0, width, height).data;
+
+    // Brightness with a little more contrast, then Floyd-Steinberg to on/off.
+    const level = new Float32Array(width * height);
+    for (let i = 0; i < level.length; i++) {
+	const brightness = (0.299 * pixels[i * 4] + 0.587 * pixels[i * 4 + 1] +
+			    0.114 * pixels[i * 4 + 2]) / 255;
+	level[i] = (brightness - 0.5) * 1.35 + 0.52;
+    }
+    const context = canvas.getContext('2d');
+    context.fillStyle = getComputedStyle(terminal).color;
+    const left = box.column * 7 + Math.floor((boxWidth - width) / 2) * dotWidth;
+    const top = box.row * 8 + Math.floor((boxHeight - height) / 2);
+    for (let y = 0; y < height; y++) {
+	for (let x = 0; x < width; x++) {
+	    const i = y * width + x;
+	    const lit = level[i] >= 0.5;
+	    const error = level[i] - (lit ? 1 : 0);
+	    if (x + 1 < width) level[i + 1] += error * 7 / 16;
+	    if (y + 1 < height) {
+		if (x > 0) level[i + width - 1] += error * 3 / 16;
+		level[i + width] += error * 5 / 16;
+		if (x + 1 < width) level[i + width + 1] += error / 16;
+	    }
+	    if (lit) {
+		context.fillRect(left + x * dotWidth, top + y, dotWidth, 1);
+	    }
+	}
+    }
+}
+
+function graphicsScreen(rows) {
+    /* A hi-res screen for a program to draw on every frame: 280 dots
+     * across and `rows` text rows (8 dots each) down from the top, the
+     * rest of the screen left to the text below, as in the IIe's mixed
+     * mode. Set dots[y * width + x] to 1 for a lit dot, then show(). */
+    const width = 280;
+    const height = rows * 8;
+    const dots = new Uint8Array(width * height);
+    let layer = null;
+    let image = null;
+    let color = null;
+    return {
+	width,
+	height,
+	dots,
+	show() {
+	    if (!layer || layer.dotWidth !== (columns === 80 ? 2 : 1) || !graphicsCanvas) {
+		layer = graphicsLayer(); // measured once, again only if the screen changes
+		const context = layer.canvas.getContext('2d');
+		image = context.createImageData(width * layer.dotWidth, height);
+		color = getComputedStyle(terminal).color.match(/\d+/g).map(Number);
+	    }
+	    const pixels = image.data;
+	    const dotWidth = layer.dotWidth;
+	    for (let y = 0; y < height; y++) {
+		for (let x = 0; x < width; x++) {
+		    const lit = dots[y * width + x];
+		    for (let d = 0; d < dotWidth; d++) {
+			const p = (y * width * dotWidth + x * dotWidth + d) * 4;
+			pixels[p] = color[0];
+			pixels[p + 1] = color[1];
+			pixels[p + 2] = color[2];
+			pixels[p + 3] = lit ? 255 : 0;
+		    }
+		}
+	    }
+	    layer.canvas.getContext('2d').putImageData(image, 0, 0);
+	},
+    };
+}
+
+async function loadBitmap(url, width, height) {
+    /* An image scaled to width x height dots, as brightness (0-1) and
+     * coverage (0-1) per dot, for a program to turn into a sprite. */
+    const image = await loadImage(url);
+    const work = document.createElement('canvas');
+    work.width = width;
+    work.height = height;
+    const context = work.getContext('2d', { willReadFrequently: true });
+    context.drawImage(image, 0, 0, width, height);
+    const pixels = context.getImageData(0, 0, width, height).data;
+    const level = new Float32Array(width * height);
+    const alpha = new Float32Array(width * height);
+    for (let i = 0; i < level.length; i++) {
+	level[i] = (0.299 * pixels[i * 4] + 0.587 * pixels[i * 4 + 1] + 0.114 * pixels[i * 4 + 2]) / 255;
+	alpha[i] = pixels[i * 4 + 3] / 255;
+    }
+    return { width, height, level, alpha };
+}
+
+/* Sound, with Web Audio: one context for the machine, made the first time
+ * a program asks (after a key press, which browsers require). */
+let audio = null;
+
+function audioContext() {
+    // Every sound goes through audio.master, which the sound button turns
+    // to 0: silent, but each sound still takes its time, as the modem needs.
+    if (!audio) {
+	audio = new (window.AudioContext || window.webkitAudioContext)();
+	audio.master = audio.createGain();
+	audio.master.gain.value = soundOn ? 1 : 0;
+	audio.master.connect(audio.destination);
+    }
+    if (audio.state === 'suspended') {
+	audio.resume();
+    }
+    return audio;
+}
+
+/* The sound button: everything the Apple plays, on or off, remembered in
+ * this browser. */
+const SOUND_PREFERENCE = 'apple-IIe-sound';
+let soundOn = readSoundPreference();
+let soundToggle = null;
+
+function readSoundPreference() {
+    try {
+	return window.localStorage.getItem(SOUND_PREFERENCE) !== 'off';
+    } catch (error) {
+	return true; // no storage (a private window, say): sound on
+    }
+}
+
+function setSound(on) {
+    soundOn = on;
+    try {
+	window.localStorage.setItem(SOUND_PREFERENCE, on ? 'on' : 'off');
+    } catch (error) {
+	// not remembered, which is fine
+    }
+    document.body.classList.toggle('sound-off', !on);
+    if (soundToggle) {
+	soundToggle.setAttribute('aria-pressed', String(on));
+	soundToggle.title = on ? 'Sound is on' : 'Sound is off';
+    }
+    if (audio) {
+	audio.master.gain.setValueAtTime(on ? 1 : 0, audio.currentTime);
+    }
+    if (!on && window.speechSynthesis) {
+	window.speechSynthesis.cancel();
+    }
+    if (emulator && emulator.contentWindow && emulator.contentWindow.menuSetMuted) {
+	emulator.contentWindow.menuSetMuted(!on); // the //e, too
+    }
+}
+
+async function loadSound(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+	throw new Error(url + ': ' + response.status);
+    }
+    return audioContext().decodeAudioData(await response.arrayBuffer());
+}
+
+function playSound(sound, volume) {
+    // volume 0-1; 0 plays nothing.
+    if (!sound || volume <= 0) {
+	return;
+    }
+    const context = audioContext();
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    gain.gain.value = volume;
+    source.buffer = sound;
+    source.connect(gain).connect(context.master);
+    source.start();
+}
+
+// Sounds made on the spot (tones, noise), so a program that ends can stop them.
+const soundsPlaying = new Set();
+
+function playTones(frequencies, seconds, volume) {
+    /* Sine tones mixed together for `seconds`: a dial tone (350 + 440 Hz),
+     * a touch-tone digit, a ring, a modem answering. Resolves when done. */
+    const context = audioContext();
+    const gain = context.createGain();
+    const now = context.currentTime;
+    const level = volume / Math.max(1, frequencies.length);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(level, now + 0.01); // no clicks
+    gain.gain.setValueAtTime(level, now + Math.max(0.01, seconds - 0.01));
+    gain.gain.linearRampToValueAtTime(0, now + seconds);
+    gain.connect(context.master);
+    return Promise.all(frequencies.map((frequency) => new Promise((resolve) => {
+	const oscillator = context.createOscillator();
+	oscillator.frequency.value = frequency;
+	oscillator.connect(gain);
+	oscillator.onended = () => {
+	    soundsPlaying.delete(oscillator);
+	    resolve();
+	};
+	soundsPlaying.add(oscillator);
+	oscillator.start(now);
+	oscillator.stop(now + seconds);
+    })));
+}
+
+function playNoise(seconds, volume) {
+    // Hiss, for the screech of two modems agreeing on a speed.
+    const context = audioContext();
+    const length = Math.max(1, Math.floor(context.sampleRate * seconds));
+    const buffer = context.createBuffer(1, length, context.sampleRate);
+    const samples = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+	samples[i] = Math.random() * 2 - 1;
+    }
+    const source = context.createBufferSource();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1800;
+    gain.gain.value = volume;
+    source.buffer = buffer;
+    source.connect(filter).connect(gain).connect(context.master);
+    return new Promise((resolve) => {
+	source.onended = () => {
+	    soundsPlaying.delete(source);
+	    resolve();
+	};
+	soundsPlaying.add(source);
+	source.start();
+    });
+}
+
+function say(text) {
+    // A voice on the line, with the browser's own speech. Resolves when it
+    // has finished, or straight away where there's no speech.
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+	return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+	const utterance = new SpeechSynthesisUtterance(text);
+	utterance.rate = 0.95;
+	utterance.onend = utterance.onerror = () => resolve();
+	window.speechSynthesis.speak(utterance);
+	setTimeout(resolve, 1500 + text.length * 120); // in case it never says it's done
+    });
+}
+
+function stopSounds() {
+    for (const sound of soundsPlaying) {
+	try {
+	    sound.stop();
+	} catch (error) {
+	    // already stopped
+	}
+    }
+    soundsPlaying.clear();
+    if (window.speechSynthesis) {
+	window.speechSynthesis.cancel();
     }
 }
 
@@ -1199,19 +1896,33 @@ function cancelOutput() {
 	clearInterval(output);
 	output = null;
     }
+    if (resumeOutput && lines[lines.length - 1] === MORE) {
+	lines.pop(); // broken off while waiting for the next page
+	line = lines.length - 1;
+    }
+    resumeOutput = null;
+    resumeKeys = null;
 }
 
 function showData(inputData) {
     return showArrayData(inputData.split('\n'));
 }
 
-function showArrayData(dataLines) {
+// Shown in inverse at the bottom while a text file waits for its next page.
+const MORE = '\u0001MORE';
+
+function showArrayData(dataLines, pageRows = 0, speed = OUTPUT_SPEED, { keys = null, marker = false } = {}) {
+    /* Print lines one at a time, then the prompt. With pageRows, stop
+     * after that many screen rows until a key is pressed: any key, as DOS
+     * 3.3's CATALOG did (no message, just no prompt yet), or only `keys`
+     * (event.key names), with MORE at the bottom when `marker` is set. */
     const tmpDataLines = dataLines.map(toScreenText); // copy JSON array values not just a new reference
+    let rowsShown = 0;
 
     cancelOutput();
     readFromFloppy(5); // light up the floppy drive
     return new Promise((resolve) => {
-	output = setInterval(() => {
+	const printNext = () => {
 	    if (!tmpDataLines.length) {
 		cancelOutput();
 		lines.push(promptText);
@@ -1220,9 +1931,34 @@ function showArrayData(dataLines) {
 		resolve();
 		return;
 	    }
-	    lines.push(tmpDataLines.shift());
+	    if (pageRows && rowsShown + screenRows(tmpDataLines[0]) > pageRows) {
+		cancelOutput();
+		stopFloppy();
+		if (marker) {
+		    lines.push(MORE);
+		    line++;
+		    render();
+		}
+		resumeKeys = keys;
+		resumeOutput = () => {
+		    resumeOutput = null;
+		    resumeKeys = null;
+		    if (lines[lines.length - 1] === MORE) {
+			lines.pop();
+			line = lines.length - 1;
+		    }
+		    rowsShown = 0;
+		    readFromFloppy(5);
+		    output = setInterval(printNext, speed);
+		};
+		return;
+	    }
+	    const text = tmpDataLines.shift();
+	    rowsShown += screenRows(text);
+	    lines.push(text);
 	    line++;
 	    render();
-	}, OUTPUT_SPEED);
+	};
+	output = setInterval(printNext, speed);
     });
 }
