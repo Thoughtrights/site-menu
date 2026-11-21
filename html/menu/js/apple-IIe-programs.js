@@ -1742,7 +1742,10 @@ async function touchTones(machine, number, digitSeconds, gapSeconds) {
  * number ("system": "maxwell"). Each is a function of that phone book
  * entry (and the machine) returning { start(), input(text) }; both give
  * back { print: [lines], prompt: 'text', hangup: true }, all optional, or
- * a promise of one. */
+ * a promise of one. With screen: true the lines are a whole screen, drawn
+ * at once on a cleared one, as a game draws its board. A system may draw
+ * on machine.graphics; +++ and hanging up wipe it. Protovision, the
+ * largest, is in apple-IIe-protovision.js. */
 const SYSTEMS = {};
 
 /* A gopher hole on the end of the line, such as Dungeoneer's: browsed the
@@ -2121,7 +2124,7 @@ PROGRAMS.modem = (machine) => {
 		return machine.print([...lines, 'NO CARRIER']);
 	    }
 	    machine.setPrompt(result.prompt || '');
-	    return machine.print(lines);
+	    return result.screen ? machine.show(lines) : machine.print(lines);
 	});
     }
 
@@ -2181,6 +2184,7 @@ PROGRAMS.modem = (machine) => {
 	    if (online && !held) {
 		if (text.trim() === '+++') {
 		    held = true;
+		    machine.graphics.clear();
 		    machine.setPrompt('');
 		    return machine.print(['OK']);
 		}
@@ -2261,6 +2265,7 @@ PROGRAMS.dialup = (machine) => {
 
     function hangUp(lines) {
 	online = null;
+	machine.graphics.clear();
 	note = 'DISCONNECTED.';
 	machine.setPrompt('');
 	return machine.print([...lines, 'NO CARRIER']).then(() => machine.sound.pause(1.5))
@@ -2275,7 +2280,7 @@ PROGRAMS.dialup = (machine) => {
 		return hangUp(lines);
 	    }
 	    machine.setPrompt(result.prompt || '');
-	    return machine.print(lines);
+	    return result.screen ? machine.show(lines) : machine.print(lines);
 	});
     }
 

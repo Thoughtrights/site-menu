@@ -20,6 +20,7 @@
     "555-0147": { "answers": "computer", "baud": 300, "system": "daemous", "password": "snowaep" },
     "555-0158": { "answers": "computer", "baud": 300, "system": "maxwell", "password": "james" },
     "555-0161": { "answers": "voice", "says": "Hello? Hello? Kids." },
+    "555-0166": { "answers": "computer", "baud": 1200, "system": "protovision", "password": "joshua" },
     "555-0172": { "answers": "voice", "says": "Thoughtrights weather. Partly cloudy today, high near seventy. Clear tonight." },
     "555-0183": { "answers": "voice", "says": "Thank you for calling. Please hold." },
     "555-0194": { "answers": "fax" }
