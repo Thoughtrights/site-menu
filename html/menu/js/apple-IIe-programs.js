@@ -971,7 +971,7 @@ PROGRAMS.barzy = (machine, assets) => {
  * latest Treasury figure plus the past year's average growth, worked out
  * as the web page does, in big lamp-board digits, with the official
  * figures under it. S switches to one person's share, C to a chart of the
- * debt (R for a longer range), N back to the number, Q quits. Left out:
+ * debt since 1980 (R for other ranges), N back to the number, Q quits. Left out:
  * the live Treasury check (the server's copy is refreshed daily) and who
  * holds the debt.
  * payload: ["debt", "<url of the counter's debt.js>"], on the same site. */
@@ -984,8 +984,13 @@ PROGRAMS.debt = (machine, url) => {
     const NUMBER_ROWS = 6;        // the lamp board; the figures in text below
     const CHART_ROWS = 20;
     const LABEL_COLUMNS = 6;      // the chart's dollar labels, left of it
-    const RANGES = [[10, 'LAST 10 YEARS'], [20, 'LAST 20 YEARS'],
-		    [50, 'LAST 50 YEARS'], [Infinity, 'SINCE 1790']];
+    // The chart's ranges, the first one shown first: where each starts,
+    // given the latest figure's time, and what the chart calls it.
+    const RANGES = [[() => Date.UTC(1980, 0, 1), 'SINCE 1980'],
+		    [(end) => end - 10 * YEAR, 'LAST 10 YEARS'],
+		    [(end) => end - 20 * YEAR, 'LAST 20 YEARS'],
+		    [(end) => end - 50 * YEAR, 'LAST 50 YEARS'],
+		    [() => -Infinity, 'SINCE 1790']];
     const SPLASH_TEXT = ['A TICKING TALE OF TRILLIONS.',
 			 "FIGURES FROM THE U.S. TREASURY'S",
 			 'DEBT TO THE PENNY.'];
@@ -1504,9 +1509,9 @@ PROGRAMS.debt = (machine, url) => {
 	const { width: w, dots } = screen;
 	const columns = width();
 	const f = factor();
-	const [years, title] = RANGES[range];
+	const [start, title] = RANGES[range];
 	const t1 = data.latest.t;
-	const t0 = Math.max(data.rows[0].t, t1 - years * YEAR);
+	const t0 = Math.max(data.rows[0].t, start(t1));
 	const x0 = Math.ceil(w * LABEL_COLUMNS / columns) + 1;
 	const x1 = w - 1;
 	const timeAt = (x) => t0 + (x - x0) / (x1 - x0) * (t1 - t0);
@@ -1549,7 +1554,7 @@ PROGRAMS.debt = (machine, url) => {
 	const every = span <= 12 ? 2 : span <= 25 ? 5 : span <= 60 ? 10 : 50;
 	const first = new Date(t0).getUTCFullYear();
 	const row = Array(columns).fill(' ');
-	let free = LABEL_COLUMNS;
+	let free = 0; // the margin is empty on this row, so 1980 can sit under it
 	for (let year = Math.ceil(first / every) * every; ; year += every) {
 	    const t = Date.UTC(year, 0, 1);
 	    if (t > t1) {
@@ -1578,7 +1583,8 @@ PROGRAMS.debt = (machine, url) => {
     function prompt() {
 	const narrow = width() < 80;
 	if (view === 'chart') {
-	    return narrow ? 'R RANGE  S SHARE  N NUMBER  Q ' : 'R RANGE   S YOUR SHARE   N NUMBER   Q QUIT ';
+	    return narrow ? 'R ADJUST RANGE  S SHARE  N NUMBER  Q '
+		: 'R ADJUST RANGE   S YOUR SHARE   N NUMBER   Q QUIT ';
 	}
 	return narrow ? 'S SHARE  C CHART  Q QUIT ' : 'S YOUR SHARE   C CHART   Q QUIT ';
     }

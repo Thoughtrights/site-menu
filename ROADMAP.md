@@ -100,7 +100,7 @@ tycoon in a top hat between his money bags, coins raining down, tipping his
 hat. Then the counter in big lamp-board digits, ticking from the latest
 Treasury figure at the past year's average rate as the web page does, with
 the official figures under it. S switches to one person's share, C to a
-chart (R for 10, 20 or 50 years, or since 1790), Q quits. It reads
+chart since 1980 (R for 10, 20 or 50 years, or since 1790), Q quits. It reads
 `/us-debt-counter/debt.js`, which the server's daily job keeps fresh; on the
 dev server it comes from the public repository. What's left:
 

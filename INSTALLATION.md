@@ -61,8 +61,9 @@ The dev server already serves the Apple at http://localhost:8765/.
 and zoomed in, skip the boot, and type the command. Any case works
 (`/BRUN/Debt`), and a hyphen stands for a space (`/brun/zork-iii`). `RUN`
 and `BRUN` find the file either way. A name that isn't on the disk gets DOS's
-`FILE NOT FOUND`. Have Apache serve the Apple page at those addresses. In the
-site's `<VirtualHost>`:
+`FILE NOT FOUND`. Have Apache serve the Apple page at those addresses, with
+these lines in **both** of the site's `<VirtualHost>` blocks, the one for
+port 80 and the one for port 443:
 
 ```apache
 RewriteEngine On
@@ -70,11 +71,28 @@ RewriteRule "^/(run|brun|open)/[A-Za-z0-9 .-]{1,30}/?$" /menu/apple-IIe.html [NC
 RewriteRule "^/menu-uat/(run|brun|open)/[A-Za-z0-9 .-]{1,30}/?$" /menu-uat/apple-IIe.html [NC,L]
 ```
 
+Browsers use https, and certbot keeps the port 443 site in a file of its own
+(`/etc/apache2/sites-available/*-le-ssl.conf`). Rules in the port 80 site
+don't reach it: with the lines only there, `http://` links work and
+`https://` ones get a 404 with nothing in the error log. Each `<VirtualHost>`
+needs its own `RewriteEngine On`, too. `sudo apache2ctl -S` lists which file
+holds which site. Put the lines straight in the `<VirtualHost>`, not inside
+a `<Directory>` block or `.htaccess`, where a pattern starting `^/` never
+matches.
+
 The second line gives uat the same links under `/menu-uat/`. The address
 stays as typed, the page's `<base>` keeps its files coming from its mount,
 and the page reads the command from the address. `[NC]` makes the match
 case-insensitive. It needs `mod_rewrite` (`sudo a2enmod rewrite`). This
-changes the live server, so check it first with `sudo apache2ctl configtest`.
+changes the live server, so check it first with `sudo apache2ctl configtest`,
+then `sudo systemctl reload apache2` (a reload keeps the old settings running
+if the new ones are wrong; a restart doesn't). To check from anywhere:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://www.thoughtrights.com/brun/debt
+```
+
+200 means it works.
 
 The dev server already serves these, for example
 http://localhost:8765/brun/debt.
